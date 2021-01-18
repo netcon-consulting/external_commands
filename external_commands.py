@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V1.0.0
+# external_commands.py V1.1.0
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -53,6 +53,7 @@ TEMPLATE_AREA = Template('<MessageArea auditorNotificationAuditor="admin" audito
 TEMPLATE_RULE = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><ExecutablePolicyRule name="$name" siteSpecific="false" template="9255cf2d-3000-832b-406e-38bd46975444" uuid="$uuid_rule"><WhatToFind><MediaTypes selection="anyof" uuid="$uuid_media">$media_types</MediaTypes><Direction direction="either" uuid="$uuid_direction"/><ExecutableSettings uuid="$uuid_command"><Filename>$command</Filename><CmdLine>$parameters</CmdLine><ResponseList>$return_codes</ResponseList><Advanced mutex="false" timeout="$timeout"><LogFilePrefix>&gt;&gt;&gt;&gt;</LogFilePrefix><LogFilePostfix>&lt;&lt;&lt;&lt;</LogFilePostfix></Advanced></ExecutableSettings></WhatToFind><PrimaryActions><WhatToDo><Disposal disposal="$uuid_deliver" primaryCrypto="UNDEFINED" secondary="$uuid_none" secondaryCrypto="UNDEFINED" uuid="$uuid_deliver_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="allow" uuid="$uuid_deliver_web"/></WhatToDoWeb><WhatElseToDo/></PrimaryActions><ModifiedActions><WhatToDo><Disposal disposal="$uuid_modified_primary" primaryCrypto="UNDEFINED" secondary="$uuid_modified_secondary" secondaryCrypto="UNDEFINED" uuid="$uuid_modified_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="none" uuid="$uuid_modified_web"/></WhatToDoWeb><WhatElseToDo/></ModifiedActions><DetectedActions><WhatToDo><Disposal disposal="$uuid_detected_primary" primaryCrypto="UNDEFINED" secondary="$uuid_detected_secondary" secondaryCrypto="UNDEFINED" uuid="$uuid_detected_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="none" uuid="$uuid_detected_web"/></WhatToDoWeb><WhatElseToDo/></DetectedActions></ExecutablePolicyRule>')
 TEMPLATE_MEDIA = Template('<MediaType$sub_types>$uuid</MediaType>')
 TEMPLATE_RETURN = Template('<Response action="$action" code="$return_code">$description</Response>')
+TEMPLATE_PARAMETER = Template("# $name\n# type: $type\n# description: $description\n\n$name = $value")
 
 CS_USER = "tomcat"
 CS_GROUP = "cs-adm"
@@ -108,10 +109,15 @@ PARAMETERS_NO_CONFIG = "%FILENAME% %LOGNAME%"
 PARAMETERS_CONFIG = '%FILENAME% %LOGNAME% "Config - {}"'
 TIMEOUT = 60
 
+PARAMETER_TYPE = "type"
+PARAMETER_DESCRIPTION = "description"
+PARAMETER_VALUE = "value"
+
 TupleMediaType = namedtuple("TupleMediaType", "uuid sub_types")
 TupleResult = namedtuple("TupleResult", "action description")
 TupleAction = namedtuple("TupleAction", "primary secondary")
 TupleDisposalAction = namedtuple("TupleDisposalAction", "detected modified")
+TupleParameter = namedtuple("TupleParameter", "type description value")
 TupleRule = namedtuple("TupleRule", "packages modules list_address list_url list_lexical parameters timeout media_types return_codes disposal_actions config")
 
 @enum.unique
@@ -453,10 +459,10 @@ def parse_config(str_config):
     except:
         raise Exception("Config not valid JSON format")
 
-    config = dict()
+    config_command = dict()
 
     for (name, rule) in dict_config.items():
-        if name in config:
+        if name in config_command:
             raise Exception("Duplicate rule name '{}'".format(name))
 
         if KEY_MEDIA_TYPES in rule:
@@ -556,9 +562,41 @@ def parse_config(str_config):
         else:
             disposal_actions = TupleDisposalAction(modified=TupleAction(primary=DISPOSAL_NONE, secondary=DISPOSAL_NONE) , detected=TupleAction(primary=DISPOSAL_NONE, secondary=DISPOSAL_NONE))
 
-        config[name] = TupleRule(packages=list2set(rule.get(KEY_PACKAGES)), modules=list2set(rule.get(KEY_MODULES)), list_address=list2set(rule.get(KEY_LIST_ADDRESS)), list_url=list2set(rule.get(KEY_LIST_URL)), list_lexical=list2set(rule.get(KEY_LIST_LEXICAL)), parameters=rule.get(KEY_PARAMETERS, PARAMETERS_CONFIG.format(name) if KEY_CONFIG in rule else PARAMETERS_NO_CONFIG), timeout=rule.get(KEY_TIMEOUT, TIMEOUT), media_types=media_types, return_codes=return_codes, disposal_actions=disposal_actions, config=rule.get(KEY_CONFIG))
+        if KEY_CONFIG in rule:
+            config = dict()
 
-    return config
+            for (key, parameter) in rule[KEY_CONFIG].items():
+                if key in config:
+                    raise Exception("Duplicate parameter '{}'".format(key))
+
+                if not PARAMETER_TYPE in parameter:
+                    raise Exception("Parameter '{}' missing type".format(key))
+
+                if not PARAMETER_DESCRIPTION in parameter:
+                    raise Exception("Parameter '{}' missing description".format(key))
+
+                if not PARAMETER_VALUE in parameter:
+                    raise Exception("Parameter '{}' missing value".format(key))
+
+                config[key] = TupleParameter(type=parameter[PARAMETER_TYPE], description=parameter[PARAMETER_DESCRIPTION], value=parameter[PARAMETER_VALUE])
+        else:
+            config = None
+
+        config_command[name] = TupleRule(
+            packages=list2set(rule.get(KEY_PACKAGES)),
+            modules=list2set(rule.get(KEY_MODULES)),
+            list_address=list2set(rule.get(KEY_LIST_ADDRESS)),
+            list_url=list2set(rule.get(KEY_LIST_URL)),
+            list_lexical=list2set(rule.get(KEY_LIST_LEXICAL)),
+            parameters=rule.get(KEY_PARAMETERS, PARAMETERS_CONFIG.format(name) if KEY_CONFIG in rule else PARAMETERS_NO_CONFIG),
+            timeout=rule.get(KEY_TIMEOUT, TIMEOUT),
+            media_types=media_types,
+            return_codes=return_codes,
+            disposal_actions=disposal_actions,
+            config=config
+        )
+
+    return config_command
 
 def download_script(command):
     """
@@ -692,7 +730,19 @@ def command_install(args):
 
                 try:
                     with open(file_lexical, "w") as f:
-                        f.write(TEMPLATE_LEXICAL.substitute(count=str(len(rule.config)), name="Config - {}".format(name), uuid=uuid, phrases="".join([ TEMPLATE_PHRASE.substitute(text=quoteattr("{} = {}".format(parameter, rule.config[parameter])), uuid=generate_uuid()) for parameter in sorted(rule.config.keys()) ])))
+                        f.write(TEMPLATE_LEXICAL.substitute(
+                            count=str(len(rule.config)),
+                            name="Config - {}".format(name),
+                            uuid=uuid,
+                            phrases="".join([ TEMPLATE_PHRASE.substitute(
+                                text=quoteattr(TEMPLATE_PARAMETER.substitute(
+                                    name=parameter,
+                                    type=rule.config[parameter].type,
+                                    description=rule.config[parameter].description,
+                                    value=rule.config[parameter].value)),
+                                uuid=generate_uuid()
+                            ) for parameter in sorted(rule.config.keys()) ])
+                        ))
 
                     chown(file_lexical, user=CS_USER, group=CS_GROUP)
                 except:
