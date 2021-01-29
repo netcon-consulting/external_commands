@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V1.1.0
+# external_commands.py V1.1.1
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -406,7 +406,7 @@ def create_lists(set_name, template, directory, tag):
 
             chown(file_list, user=CS_USER, group=CS_GROUP)
         except:
-            print("Cannot write list file '{}'".format(file_list))
+            raise Exception("Cannot write list file '{}'".format(file_list))
 
 def create_lexical_lists(set_name):
     """
@@ -428,7 +428,7 @@ def create_lexical_lists(set_name):
 
             chown(file_lexical, user=CS_USER, group=CS_GROUP)
         except:
-            print("Cannot write lexical list file '{}'".format(file_lexical))
+            raise Exception("Cannot write lexical list file '{}'".format(file_lexical))
 
 def list2set(list_in):
     """
