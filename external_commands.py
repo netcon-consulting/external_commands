@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V1.1.1
+# external_commands.py V1.2.0
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -33,6 +33,7 @@ DIR_UICONFIG = Path("/var/cs-gateway/uicfg")
 DIR_POLICY = DIR_UICONFIG.joinpath("policy")
 DIR_RULES = DIR_POLICY.joinpath("rules")
 DIR_ADDRESS = DIR_POLICY.joinpath("addresslists")
+DIR_FILENAME = DIR_POLICY.joinpath("filenames")
 DIR_URL = DIR_POLICY.joinpath("urllists")
 DIR_LEXICAL = DIR_POLICY.joinpath("ta")
 DIR_SCRIPTS = Path('/opt/cs-gateway/scripts/netcon')
@@ -45,12 +46,13 @@ FILE_INSTALLED = DIR_SCRIPTS.joinpath("installed_commands.txt")
 
 MODULES_LIBRARY = { "toml", "pyzipper", "beautifulsoup4", "html5lib" }
 
-TEMPLATE_ADDRESS = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><AddressList name="$name" type="static" uuid="$uuid"><Address>dummy@dummy.com</Address></AddressList>')
-TEMPLATE_URL = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><UrlList name="$name" type="CUSTOM" uuid="$uuid"><Url>dummy.com</Url></UrlList>')
-TEMPLATE_LEXICAL = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><TextualAnalysis count="$count" followedby="10" name="$name" nearness="10" summary="" threshold="10" triggerOnce="false" uuid="$uuid">$phrases</TextualAnalysis>')
+TEMPLATE_ADDRESS = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><AddressList name=$name type="static" uuid="$uuid"><Address>dummy@dummy.com</Address></AddressList>')
+TEMPLATE_FILENAME = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><FilenameList name=$name type="static" uuid="$uuid"><Filename>dummy</Filename></FilenameList>')
+TEMPLATE_URL = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><UrlList name=$name type="CUSTOM" uuid="$uuid"><Url>dummy.com</Url></UrlList>')
+TEMPLATE_LEXICAL = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><TextualAnalysis count="$count" followedby="10" name=$name nearness="10" summary="" threshold="10" triggerOnce="false" uuid="$uuid">$phrases</TextualAnalysis>')
 TEMPLATE_PHRASE = Template('<Phrase case="false" redact="false" summary="" text=$text type="custom" uuid="$uuid" weight="10"><customEntityIndexes/><qualifierIndexes/></Phrase>')
-TEMPLATE_AREA = Template('<MessageArea auditorNotificationAuditor="admin" auditorNotificationAuditorAddress="" auditorNotificationEnabled="false" auditorNotificationpwdOtherAddress="" auditorNotificationPlainBody="A message was released by %RELEASEDBY% which violated the policy %POLICYVIOLATED%. A version of the email has been attached.&#10;&#10;To: %RCPTS%&#10;Subject: %SUBJECT%&#10;Date sent: %DATE%" auditorNotificationSender="admin" auditorNotificationSubject="A message which violated policy %POLICYVIOLATED% has been released." delayedReleaseDelay="15" expiry="30" name="$name" notificationEnabled="false" notificationOtherAddress="" notificationPlainBody="A message you sent has been released by the administrator&#10;&#10;To: %RCPTS%&#10;Subject: %SUBJECT%&#10;Date sent: %DATE%" notificationSender="admin" notificationSubject="A message you sent has been released" notspam="true" pmm="false" releaseRate="10000" releaseScheduleType="throttle" scheduleEnabled="false" system="false" uuid="$uuid"><PMMAddressList/><WeeklySchedule mode="ONE_HOUR"><DailyScheduleList><DailySchedule day="1" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="2" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="3" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="4" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="5" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="6" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="7" mode="ONE_HOUR">000000000000000000000000</DailySchedule></DailyScheduleList></WeeklySchedule></MessageArea></DisposalCollection>')
-TEMPLATE_RULE = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><ExecutablePolicyRule name="$name" siteSpecific="false" template="9255cf2d-3000-832b-406e-38bd46975444" uuid="$uuid_rule"><WhatToFind><MediaTypes selection="anyof" uuid="$uuid_media">$media_types</MediaTypes><Direction direction="either" uuid="$uuid_direction"/><ExecutableSettings uuid="$uuid_command"><Filename>$command</Filename><CmdLine>$parameters</CmdLine><ResponseList>$return_codes</ResponseList><Advanced mutex="false" timeout="$timeout"><LogFilePrefix>&gt;&gt;&gt;&gt;</LogFilePrefix><LogFilePostfix>&lt;&lt;&lt;&lt;</LogFilePostfix></Advanced></ExecutableSettings></WhatToFind><PrimaryActions><WhatToDo><Disposal disposal="$uuid_deliver" primaryCrypto="UNDEFINED" secondary="$uuid_none" secondaryCrypto="UNDEFINED" uuid="$uuid_deliver_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="allow" uuid="$uuid_deliver_web"/></WhatToDoWeb><WhatElseToDo/></PrimaryActions><ModifiedActions><WhatToDo><Disposal disposal="$uuid_modified_primary" primaryCrypto="UNDEFINED" secondary="$uuid_modified_secondary" secondaryCrypto="UNDEFINED" uuid="$uuid_modified_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="none" uuid="$uuid_modified_web"/></WhatToDoWeb><WhatElseToDo/></ModifiedActions><DetectedActions><WhatToDo><Disposal disposal="$uuid_detected_primary" primaryCrypto="UNDEFINED" secondary="$uuid_detected_secondary" secondaryCrypto="UNDEFINED" uuid="$uuid_detected_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="none" uuid="$uuid_detected_web"/></WhatToDoWeb><WhatElseToDo/></DetectedActions></ExecutablePolicyRule>')
+TEMPLATE_AREA = Template('<MessageArea auditorNotificationAuditor="admin" auditorNotificationAuditorAddress="" auditorNotificationEnabled="false" auditorNotificationpwdOtherAddress="" auditorNotificationPlainBody="A message was released by %RELEASEDBY% which violated the policy %POLICYVIOLATED%. A version of the email has been attached.&#10;&#10;To: %RCPTS%&#10;Subject: %SUBJECT%&#10;Date sent: %DATE%" auditorNotificationSender="admin" auditorNotificationSubject="A message which violated policy %POLICYVIOLATED% has been released." delayedReleaseDelay="15" expiry="30" name=$name notificationEnabled="false" notificationOtherAddress="" notificationPlainBody="A message you sent has been released by the administrator&#10;&#10;To: %RCPTS%&#10;Subject: %SUBJECT%&#10;Date sent: %DATE%" notificationSender="admin" notificationSubject="A message you sent has been released" notspam="true" pmm="false" releaseRate="10000" releaseScheduleType="throttle" scheduleEnabled="false" system="false" uuid="$uuid"><PMMAddressList/><WeeklySchedule mode="ONE_HOUR"><DailyScheduleList><DailySchedule day="1" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="2" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="3" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="4" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="5" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="6" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="7" mode="ONE_HOUR">000000000000000000000000</DailySchedule></DailyScheduleList></WeeklySchedule></MessageArea></DisposalCollection>')
+TEMPLATE_RULE = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><ExecutablePolicyRule name=$name siteSpecific="false" template="9255cf2d-3000-832b-406e-38bd46975444" uuid="$uuid_rule"><WhatToFind><MediaTypes selection="anyof" uuid="$uuid_media">$media_types</MediaTypes><Direction direction="either" uuid="$uuid_direction"/><ExecutableSettings uuid="$uuid_command"><Filename>$command</Filename><CmdLine>$parameters</CmdLine><ResponseList>$return_codes</ResponseList><Advanced mutex="false" timeout="$timeout"><LogFilePrefix>&gt;&gt;&gt;&gt;</LogFilePrefix><LogFilePostfix>&lt;&lt;&lt;&lt;</LogFilePostfix></Advanced></ExecutableSettings></WhatToFind><PrimaryActions><WhatToDo><Disposal disposal="$uuid_deliver" primaryCrypto="UNDEFINED" secondary="$uuid_none" secondaryCrypto="UNDEFINED" uuid="$uuid_deliver_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="allow" uuid="$uuid_deliver_web"/></WhatToDoWeb><WhatElseToDo/></PrimaryActions><ModifiedActions><WhatToDo><Disposal disposal="$uuid_modified_primary" primaryCrypto="UNDEFINED" secondary="$uuid_modified_secondary" secondaryCrypto="UNDEFINED" uuid="$uuid_modified_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="none" uuid="$uuid_modified_web"/></WhatToDoWeb><WhatElseToDo/></ModifiedActions><DetectedActions><WhatToDo><Disposal disposal="$uuid_detected_primary" primaryCrypto="UNDEFINED" secondary="$uuid_detected_secondary" secondaryCrypto="UNDEFINED" uuid="$uuid_detected_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="none" uuid="$uuid_detected_web"/></WhatToDoWeb><WhatElseToDo/></DetectedActions></ExecutablePolicyRule>')
 TEMPLATE_MEDIA = Template('<MediaType$sub_types>$uuid</MediaType>')
 TEMPLATE_RETURN = Template('<Response action="$action" code="$return_code">$description</Response>')
 TEMPLATE_PARAMETER = Template("# $name\n# type: $type\n# description: $description\n\n$name = $value")
@@ -61,6 +63,7 @@ CS_GROUP = "cs-adm"
 KEY_PACKAGES = "packages"
 KEY_MODULES = "modules"
 KEY_LIST_ADDRESS = "list_address"
+KEY_LIST_FILENAME = "list_filename"
 KEY_LIST_URL = "list_url"
 KEY_LIST_LEXICAL = "list_lexical"
 KEY_PARAMETERS = "parameters"
@@ -118,7 +121,7 @@ TupleResult = namedtuple("TupleResult", "action description")
 TupleAction = namedtuple("TupleAction", "primary secondary")
 TupleDisposalAction = namedtuple("TupleDisposalAction", "detected modified")
 TupleParameter = namedtuple("TupleParameter", "type description value")
-TupleRule = namedtuple("TupleRule", "packages modules list_address list_url list_lexical parameters timeout media_types return_codes disposal_actions config")
+TupleRule = namedtuple("TupleRule", "packages modules list_address list_filename list_url list_lexical parameters timeout media_types return_codes disposal_actions config")
 
 @enum.unique
 class ReturnCode(enum.IntEnum):
@@ -402,7 +405,7 @@ def create_lists(set_name, template, directory, tag):
 
         try:
             with open(file_list, "w") as f:
-                f.write(template.substitute(name=name, uuid=uuid))
+                f.write(template.substitute(name=quoteattr(name), uuid=uuid))
 
             chown(file_list, user=CS_USER, group=CS_GROUP)
         except:
@@ -424,7 +427,7 @@ def create_lexical_lists(set_name):
 
         try:
             with open(file_lexical, "w") as f:
-                f.write(TEMPLATE_LEXICAL.substitute(count="1", name=name, uuid=uuid, phrases=TEMPLATE_PHRASE.substitute(text=quoteattr("dummy"), uuid=generate_uuid())))
+                f.write(TEMPLATE_LEXICAL.substitute(count="1", name=quoteattr(name), uuid=uuid, phrases=TEMPLATE_PHRASE.substitute(text=quoteattr("dummy"), uuid=generate_uuid())))
 
             chown(file_lexical, user=CS_USER, group=CS_GROUP)
         except:
@@ -586,6 +589,7 @@ def parse_config(str_config):
             packages=list2set(rule.get(KEY_PACKAGES)),
             modules=list2set(rule.get(KEY_MODULES)),
             list_address=list2set(rule.get(KEY_LIST_ADDRESS)),
+            list_filename=list2set(rule.get(KEY_LIST_FILENAME)),
             list_url=list2set(rule.get(KEY_LIST_URL)),
             list_lexical=list2set(rule.get(KEY_LIST_LEXICAL)),
             parameters=rule.get(KEY_PARAMETERS, PARAMETERS_CONFIG.format(name) if KEY_CONFIG in rule else PARAMETERS_NO_CONFIG),
@@ -705,7 +709,7 @@ def command_install(args):
                             with open(FILE_DISPOSAL, "r+b") as f:
                                 f.seek(-21, SEEK_END)
 
-                                f.write(TEMPLATE_AREA.substitute(name=action[5:], uuid=uuid).encode("utf-8"))
+                                f.write(TEMPLATE_AREA.substitute(name=quoteattr(action[5:]), uuid=uuid).encode("utf-8"))
                         except:
                             raise Exception("Cannot write disposal actions file '{}'".format(FILE_DISPOSAL))
 
@@ -713,6 +717,9 @@ def command_install(args):
 
             if rule.list_address:
                 create_lists(rule.list_address, TEMPLATE_ADDRESS, DIR_ADDRESS, "AddressList")
+
+            if rule.list_filename:
+                create_lists(rule.list_filename, TEMPLATE_FILENAME, DIR_FILENAME, "FilenameList")
 
             if rule.list_url:
                 create_lists(rule.list_url, TEMPLATE_URL, DIR_URL, "UrlList")
@@ -732,7 +739,7 @@ def command_install(args):
                     with open(file_lexical, "w") as f:
                         f.write(TEMPLATE_LEXICAL.substitute(
                             count=str(len(rule.config)),
-                            name="Config - {}".format(name),
+                            name=quoteattr("Config - {}".format(name)),
                             uuid=uuid,
                             phrases="".join([ TEMPLATE_PHRASE.substitute(
                                 text=quoteattr(TEMPLATE_PARAMETER.substitute(
@@ -758,7 +765,7 @@ def command_install(args):
             try:
                 with open(file_rule, "w") as f:
                     f.write(TEMPLATE_RULE.substitute(
-                        name=name,
+                        name=quoteattr(name),
                         uuid_rule=uuid,
                         media_types="".join([ TEMPLATE_MEDIA.substitute(
                             uuid=dict_media_type[mnemonic].uuid,
