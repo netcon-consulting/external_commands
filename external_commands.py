@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V1.2.0
+# external_commands.py V1.3.0
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -15,7 +15,7 @@ from xml.sax import make_parser, handler, SAXException
 from xml.sax.saxutils import quoteattr, escape
 from uuid import uuid4 as generate_uuid
 from os import chmod, SEEK_END
-from subprocess import check_call, DEVNULL
+from subprocess import run, DEVNULL
 from shutil import chown
 import json
 from urllib.request import urlopen, urlretrieve
@@ -42,7 +42,6 @@ FILE_DISPOSAL = DIR_POLICY.joinpath("disposals.xml")
 FILE_MEDIATYPES = Path("/opt/cs-gateway/cfg/ui/mediatypes.xml")
 FILE_STATUS = DIR_UICONFIG.joinpath("trail.xml")
 FILE_LIBRARY = DIR_SCRIPTS.joinpath("netcon.py")
-FILE_INSTALLED = DIR_SCRIPTS.joinpath("installed_commands.txt")
 
 MODULES_LIBRARY = { "toml", "pyzipper", "beautifulsoup4", "html5lib" }
 
@@ -619,16 +618,16 @@ def download_script(command):
 
     chmod(file_script, 0o755)
 
-def command_list(_):
+def command_list(_, command_description):
     """
     List available external commands.
+
+    :type command_description: dict
     """
-    dict_command = get_commands()
+    for command in sorted(command_description.keys()):
+        print("{}\t\t{}".format(command, command_description[command]))
 
-    for command in sorted(dict_command.keys()):
-        print("{}\t\t{}".format(command, dict_command[command]))
-
-def command_info(args):
+def command_info(args, _):
     """
     Print information about external commands.
 
@@ -644,11 +643,12 @@ def command_info(args):
 
         print(readme)
 
-def command_install(args):
+def command_install(args, command_description):
     """
     Install external commands.
 
     :type args: argparse.Namespace
+    :type command_description: dict
     """
     dict_media_type = get_media_types()
 
@@ -656,11 +656,11 @@ def command_install(args):
 
     for module in MODULES_LIBRARY:
         try:
-            check_call([ sys.executable, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL)
+            run([ sys.executable, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
         except:
             raise Exception("Cannot install Python module '{}'".format(module))
 
-    command_update(args)
+    command_update(args, command_description)
 
     for command in args.command:
         url_config = "{}/{}/{}".format(URL_REPO, command, FILE_CONFIG)
@@ -685,14 +685,14 @@ def command_install(args):
             if rule.packages:
                 for package in rule.packages:
                     try:
-                        check_call([ "/usr/bin/yum", "install", "-y", package ], stdout=DEVNULL, stderr=DEVNULL)
+                        run([ "/usr/bin/yum", "install", "-y", package ], stdout=DEVNULL, stderr=DEVNULL, check=True)
                     except:
                         raise Exception("Cannot install package '{}'".format(package))
 
             if rule.modules:
                 for module in rule.modules:
                     try:
-                        check_call([ sys.executable, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL)
+                        run([ sys.executable, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
                     except:
                         raise Exception("Cannot install Python module '{}'".format(module))
 
@@ -812,44 +812,34 @@ def command_install(args):
     except:
         raise Exception("Cannot write status file '{}'".format(FILE_STATUS))
 
-    try:
-        with open(FILE_INSTALLED, "a") as f:
-            f.write("{}\n".format("\n".join(args.command)))
-    except:
-        raise Exception("Cannot write installed commands file '{}'".format(FILE_STATUS))
-
     if args.reload:
         try:
-            check_call([ "/opt/cs-gateway/bin/cs-servicecontrol", "restart", "tomcat" ], stdout=DEVNULL, stderr=DEVNULL)
+            run("source /etc/profile.d/cs-vars.sh; /opt/cs-gateway/bin/cs-servicecontrol restart tomcat", shell=True, stdout=DEVNULL, stderr=DEVNULL, check=True)
         except:
             raise Exception("Cannot restart Tomcat service")
 
-def command_update(_):
+def command_update(_, command_description):
     """
     Update installed external commands.
+
+    :type command_description: dict
     """
     try:
         urlretrieve(URL_LIBRARY, FILE_LIBRARY)
     except:
         raise Exception("Cannot download library '{}'".format(URL_LIBRARY))
 
-    try:
-        with open(FILE_INSTALLED, "r") as f:
-            installed = f.read()
-    except FileNotFoundError:
-        installed = ""
-    except:
-        raise Exception("Cannot read installed commands file '{}'".format(FILE_INSTALLED))
-
-    if installed:
-        for command in { command.strip() for command in installed.split("\n") if command }:
+    for command in command_description.keys():
+        if DIR_SCRIPTS.joinpath("{}.py".format(command)).exists():
             download_script(command)
 
 def main(args):
+    command_description = get_commands()
+
     if hasattr(args, "command"):
         args.command = set(args.command)
 
-        invalid_commands = args.command - get_commands().keys()
+        invalid_commands = args.command - command_description.keys()
 
         if invalid_commands:
             print("Invalid external commands {}".format(str(invalid_commands)[1:-1]))
@@ -857,7 +847,7 @@ def main(args):
             return ReturnCode.ERROR
 
     try:
-        args.action(args)
+        args.action(args, command_description)
     except Exception as ex:
         print(ex)
 
