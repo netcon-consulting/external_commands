@@ -863,11 +863,11 @@ if __name__ == "__main__":
 
     parser_info = subparsers.add_parser("info", help="print information about external commands")
     parser_info.set_defaults(action=command_info)
-    parser_info.add_argument("command", metavar="COMMAND", type=str, nargs='+', help="one or more external commands")
+    parser_info.add_argument("command", metavar="COMMAND", type=str, nargs="+", help="one or more external commands")
 
     parser_install = subparsers.add_parser("install", help="install external commands")
     parser_install.set_defaults(action=command_install)
-    parser_install.add_argument("command", metavar="COMMAND", type=str, nargs='+', help="one or more external commands")
+    parser_install.add_argument("command", metavar="COMMAND", type=str, nargs="+", help="one or more external commands")
     parser_install.add_argument("-r", "--reload", action="store_true", help="reload Clearswift web interface")
 
     parser_update = subparsers.add_parser("update", help="update all installed external commands to latest version")
