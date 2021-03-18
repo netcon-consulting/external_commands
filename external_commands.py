@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V1.3.0
+# external_commands.py V1.4.0
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -281,6 +281,12 @@ class HandlerDisposalActions(handler.ContentHandler):
         :rtype: dict
         """
         return self.dict_disposal_action
+
+def eprint(*args, **kwargs):
+    """
+    Print to stderr.
+    """
+    print(*args, file=sys.stderr, **kwargs)
 
 def get_commands():
     """
@@ -842,14 +848,14 @@ def main(args):
         invalid_commands = args.command - command_description.keys()
 
         if invalid_commands:
-            print("Invalid external commands {}".format(str(invalid_commands)[1:-1]))
+            eprint("Invalid external commands {}".format(str(invalid_commands)[1:-1]))
 
             return ReturnCode.ERROR
 
     try:
         args.action(args, command_description)
     except Exception as ex:
-        print(ex)
+        eprint(ex)
 
         return ReturnCode.ERROR
 
