@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V1.4.0
+# external_commands.py V1.5.0
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -43,7 +43,7 @@ FILE_MEDIATYPES = Path("/opt/cs-gateway/cfg/ui/mediatypes.xml")
 FILE_STATUS = DIR_UICONFIG.joinpath("trail.xml")
 FILE_LIBRARY = DIR_SCRIPTS.joinpath("netcon.py")
 
-MODULES_LIBRARY = { "toml", "pyzipper", "beautifulsoup4", "html5lib" }
+MODULES_LIBRARY = { "toml", "pyzipper", "beautifulsoup4", "html5lib", "dnspython" }
 
 TEMPLATE_ADDRESS = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><AddressList name=$name type="static" uuid="$uuid"><Address>dummy@dummy.com</Address></AddressList>')
 TEMPLATE_FILENAME = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><FilenameList name=$name type="static" uuid="$uuid"><Filename>dummy</Filename></FilenameList>')
@@ -660,12 +660,6 @@ def command_install(args, command_description):
 
     dict_disposal_action = get_disposal_actions()
 
-    for module in MODULES_LIBRARY:
-        try:
-            run([ sys.executable, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
-        except:
-            raise Exception("Cannot install Python module '{}'".format(module))
-
     command_update(args, command_description)
 
     for command in args.command:
@@ -830,6 +824,12 @@ def command_update(_, command_description):
 
     :type command_description: dict
     """
+    for module in MODULES_LIBRARY:
+        try:
+            run([ sys.executable, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
+        except:
+            raise Exception("Cannot install Python module '{}'".format(module))
+
     try:
         urlretrieve(URL_LIBRARY, FILE_LIBRARY)
     except:
