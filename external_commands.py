@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V1.5.0
+# external_commands.py V1.5.1
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -296,7 +296,7 @@ def get_commands():
     """
     try:
         readme = urlopen(URL_README).read().decode("utf-8")
-    except:
+    except Exception:
         raise Exception("Cannot download readme file '{}'".format(URL_README))
 
     list_readme = readme.split("\n")
@@ -413,7 +413,7 @@ def create_lists(set_name, template, directory, tag):
                 f.write(template.substitute(name=quoteattr(name), uuid=uuid))
 
             chown(file_list, user=CS_USER, group=CS_GROUP)
-        except:
+        except Exception:
             raise Exception("Cannot write list file '{}'".format(file_list))
 
 def create_lexical_lists(set_name):
@@ -435,7 +435,7 @@ def create_lexical_lists(set_name):
                 f.write(TEMPLATE_LEXICAL.substitute(count="1", name=quoteattr(name), uuid=uuid, phrases=TEMPLATE_PHRASE.substitute(text=quoteattr("dummy"), uuid=generate_uuid())))
 
             chown(file_lexical, user=CS_USER, group=CS_GROUP)
-        except:
+        except Exception:
             raise Exception("Cannot write lexical list file '{}'".format(file_lexical))
 
 def list2set(list_in):
@@ -464,7 +464,7 @@ def parse_config(str_config):
     """
     try:
         dict_config = json.loads(str_config)
-    except:
+    except Exception:
         raise Exception("Config not valid JSON format")
 
     config_command = dict()
@@ -500,7 +500,7 @@ def parse_config(str_config):
             for (return_code, result) in rule[KEY_RETURN_CODES].items():
                 try:
                     return_code = int(return_code)
-                except:
+                except Exception:
                     raise Exception("Non-integer return code '{}'".format(return_code))
 
                 if return_code in return_codes:
@@ -619,7 +619,7 @@ def download_script(command):
 
     try:
         urlretrieve(url_script, file_script)
-    except:
+    except Exception:
         raise Exception("Cannot download script '{}'".format(url_script))
 
     chmod(file_script, 0o755)
@@ -644,7 +644,7 @@ def command_info(args, _):
 
         try:
             readme = urlopen(url_readme).read().decode("utf-8")
-        except:
+        except Exception:
             raise Exception("Cannot download readme file '{}'".format(url_readme))
 
         print(readme)
@@ -667,7 +667,7 @@ def command_install(args, command_description):
 
         try:
             config = urlopen(url_config).read().decode("utf-8")
-        except:
+        except Exception:
             raise Exception("Cannot download config file '{}'".format(url_config))
 
         config = parse_config(config)
@@ -686,14 +686,14 @@ def command_install(args, command_description):
                 for package in rule.packages:
                     try:
                         run([ "/usr/bin/yum", "install", "-y", package ], stdout=DEVNULL, stderr=DEVNULL, check=True)
-                    except:
+                    except Exception:
                         raise Exception("Cannot install package '{}'".format(package))
 
             if rule.modules:
                 for module in rule.modules:
                     try:
                         run([ sys.executable, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
-                    except:
+                    except Exception:
                         raise Exception("Cannot install Python module '{}'".format(module))
 
             for disposal_action in rule.disposal_actions:
@@ -710,7 +710,7 @@ def command_install(args, command_description):
                                 f.seek(-21, SEEK_END)
 
                                 f.write(TEMPLATE_AREA.substitute(name=quoteattr(action[5:]), uuid=uuid).encode("utf-8"))
-                        except:
+                        except Exception:
                             raise Exception("Cannot write disposal actions file '{}'".format(FILE_DISPOSAL))
 
                         dict_disposal_action[action] = uuid
@@ -752,7 +752,7 @@ def command_install(args, command_description):
                         ))
 
                     chown(file_lexical, user=CS_USER, group=CS_GROUP)
-                except:
+                except Exception:
                     raise Exception("Cannot write config lexical list file '{}'".format(file_lexical))
 
             while True:
@@ -797,25 +797,25 @@ def command_install(args, command_description):
                     ))
 
                 chown(file_rule, user=CS_USER, group=CS_GROUP)
-            except:
+            except Exception:
                 raise Exception("Cannot write policy rule file '{}'".format(file_rule))
 
     try:
         with open(FILE_STATUS, "r") as f:
             content = f.read()
-    except:
+    except Exception:
         raise Exception("Cannot read status file '{}'".format(FILE_STATUS))
 
     try:
         with open(FILE_STATUS, "w") as f:
             f.write(content.replace(' changesMade="false" ', ' changesMade="true" '))
-    except:
+    except Exception:
         raise Exception("Cannot write status file '{}'".format(FILE_STATUS))
 
     if args.reload:
         try:
             run("source /etc/profile.d/cs-vars.sh; /opt/cs-gateway/bin/cs-servicecontrol restart tomcat", shell=True, stdout=DEVNULL, stderr=DEVNULL, check=True)
-        except:
+        except Exception:
             raise Exception("Cannot restart Tomcat service")
 
 def command_update(_, command_description):
@@ -827,12 +827,12 @@ def command_update(_, command_description):
     for module in MODULES_LIBRARY:
         try:
             run([ sys.executable, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
-        except:
+        except Exception:
             raise Exception("Cannot install Python module '{}'".format(module))
 
     try:
         urlretrieve(URL_LIBRARY, FILE_LIBRARY)
-    except:
+    except Exception:
         raise Exception("Cannot download library '{}'".format(URL_LIBRARY))
 
     for command in command_description.keys():
