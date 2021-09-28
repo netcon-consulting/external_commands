@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V1.6.0
+# external_commands.py V2.0.0
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -22,12 +22,22 @@ from urllib.request import urlopen, urlretrieve
 
 DESCRIPTION = "install and update external commands for Clearswift SEG 5"
 
+CHARSET_UTF8 = "utf-8"
+
+DEFAULT_INTERPRETER = "/usr/bin/python3"
+
 FILE_README = "README.md"
 FILE_CONFIG = "config.json"
+FILE_COMMAND = "run_command.py"
 
-URL_REPO = "https://raw.githubusercontent.com/netcon-consulting/clearswift-external-commands/old2"
+URL_REPO = "https://raw.githubusercontent.com/netcon-consulting/clearswift-external-commands/master"
 URL_README = "{}/{}".format(URL_REPO, FILE_README)
-URL_LIBRARY = "https://raw.githubusercontent.com/netcon-consulting/netcon.py/master/netcon.py"
+URL_COMMAND = "{}/{}".format(URL_REPO, FILE_COMMAND)
+URL_LIBRARY = "{}/command_library.py".format(URL_REPO)
+
+NAME_LIBRARY = "External command library"
+NAME_COMMAND = "External command - {}"
+NAME_CONFIG = "Config - {}"
 
 DIR_UICONFIG = Path("/var/cs-gateway/uicfg")
 DIR_POLICY = DIR_UICONFIG.joinpath("policy")
@@ -36,25 +46,37 @@ DIR_ADDRESS = DIR_POLICY.joinpath("addresslists")
 DIR_FILENAME = DIR_POLICY.joinpath("filenames")
 DIR_URL = DIR_POLICY.joinpath("urllists")
 DIR_LEXICAL = DIR_POLICY.joinpath("ta")
-DIR_SCRIPTS = Path('/opt/cs-gateway/scripts/netcon')
+
+DIR_SCRIPTS = Path("/opt/netcon_scripts")
 
 FILE_DISPOSAL = DIR_POLICY.joinpath("disposals.xml")
 FILE_MEDIATYPES = Path("/opt/cs-gateway/cfg/ui/mediatypes.xml")
 FILE_STATUS = DIR_UICONFIG.joinpath("trail.xml")
-FILE_LIBRARY = DIR_SCRIPTS.joinpath("netcon.py")
 
 MODULES_LIBRARY = { "toml", "pyzipper", "beautifulsoup4", "html5lib", "dnspython" }
 
-TEMPLATE_ADDRESS = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><AddressList name=$name type="static" uuid="$uuid"><Address>dummy@dummy.com</Address></AddressList>')
-TEMPLATE_FILENAME = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><FilenameList name=$name type="static" uuid="$uuid"><Filename>dummy</Filename></FilenameList>')
-TEMPLATE_URL = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><UrlList name=$name type="CUSTOM" uuid="$uuid"><Url>dummy.com</Url></UrlList>')
-TEMPLATE_LEXICAL = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><TextualAnalysis count="$count" followedby="10" name=$name nearness="10" summary="" threshold="10" triggerOnce="false" uuid="$uuid">$phrases</TextualAnalysis>')
-TEMPLATE_PHRASE = Template('<Phrase case="false" redact="false" summary="" text=$text type="custom" uuid="$uuid" weight="10"><customEntityIndexes/><qualifierIndexes/></Phrase>')
+TEMPLATE_LIST_ADDRESS = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><AddressList name=$name type="static" uuid="$uuid">$items</AddressList>')
+TEMPLATE_ADDRESS = Template("<Address>$item</Address>")
+TEMPLATE_LIST_FILENAME = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><FilenameList name=$name type="static" uuid="$uuid">$items</FilenameList>')
+TEMPLATE_FILENAME = Template("<Filename>$item</Filename>")
+TEMPLATE_LIST_URL = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><UrlList name=$name type="CUSTOM" uuid="$uuid">$items</UrlList>')
+TEMPLATE_URL = Template("<Url>$item</Url>")
+TEMPLATE_LIST_LEXICAL = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><TextualAnalysis count="$count" followedby="10" name=$name nearness="10" summary="" threshold="10" triggerOnce="false" uuid="$uuid">$items</TextualAnalysis>')
+TEMPLATE_PHRASE = Template('<Phrase case="false" redact="false" summary="" text=$item type="custom" uuid="$uuid" weight="10"><customEntityIndexes/><qualifierIndexes/></Phrase>')
 TEMPLATE_AREA = Template('<MessageArea auditorNotificationAuditor="admin" auditorNotificationAuditorAddress="" auditorNotificationEnabled="false" auditorNotificationpwdOtherAddress="" auditorNotificationPlainBody="A message was released by %RELEASEDBY% which violated the policy %POLICYVIOLATED%. A version of the email has been attached.&#10;&#10;To: %RCPTS%&#10;Subject: %SUBJECT%&#10;Date sent: %DATE%" auditorNotificationSender="admin" auditorNotificationSubject="A message which violated policy %POLICYVIOLATED% has been released." delayedReleaseDelay="15" expiry="30" name=$name notificationEnabled="false" notificationOtherAddress="" notificationPlainBody="A message you sent has been released by the administrator&#10;&#10;To: %RCPTS%&#10;Subject: %SUBJECT%&#10;Date sent: %DATE%" notificationSender="admin" notificationSubject="A message you sent has been released" notspam="true" pmm="false" releaseRate="10000" releaseScheduleType="throttle" scheduleEnabled="false" system="false" uuid="$uuid"><PMMAddressList/><WeeklySchedule mode="ONE_HOUR"><DailyScheduleList><DailySchedule day="1" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="2" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="3" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="4" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="5" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="6" mode="ONE_HOUR">000000000000000000000000</DailySchedule><DailySchedule day="7" mode="ONE_HOUR">000000000000000000000000</DailySchedule></DailyScheduleList></WeeklySchedule></MessageArea></DisposalCollection>')
-TEMPLATE_RULE = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><ExecutablePolicyRule name=$name siteSpecific="false" template="9255cf2d-3000-832b-406e-38bd46975444" uuid="$uuid_rule"><WhatToFind><MediaTypes selection="anyof" uuid="$uuid_media">$media_types</MediaTypes><Direction direction="either" uuid="$uuid_direction"/><ExecutableSettings uuid="$uuid_command"><Filename>$command</Filename><CmdLine>$parameters</CmdLine><ResponseList>$return_codes</ResponseList><Advanced mutex="false" timeout="$timeout"><LogFilePrefix>&gt;&gt;&gt;&gt;</LogFilePrefix><LogFilePostfix>&lt;&lt;&lt;&lt;</LogFilePostfix></Advanced></ExecutableSettings></WhatToFind><PrimaryActions><WhatToDo><Disposal disposal="$uuid_deliver" primaryCrypto="UNDEFINED" secondary="$uuid_none" secondaryCrypto="UNDEFINED" uuid="$uuid_deliver_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="allow" uuid="$uuid_deliver_web"/></WhatToDoWeb><WhatElseToDo/></PrimaryActions><ModifiedActions><WhatToDo><Disposal disposal="$uuid_modified_primary" primaryCrypto="UNDEFINED" secondary="$uuid_modified_secondary" secondaryCrypto="UNDEFINED" uuid="$uuid_modified_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="none" uuid="$uuid_modified_web"/></WhatToDoWeb><WhatElseToDo/></ModifiedActions><DetectedActions><WhatToDo><Disposal disposal="$uuid_detected_primary" primaryCrypto="UNDEFINED" secondary="$uuid_detected_secondary" secondaryCrypto="UNDEFINED" uuid="$uuid_detected_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="none" uuid="$uuid_detected_web"/></WhatToDoWeb><WhatElseToDo/></DetectedActions></ExecutablePolicyRule>')
+TEMPLATE_RULE = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><ExecutablePolicyRule name=$name siteSpecific="false" template="9255cf2d-3000-832b-406e-38bd46975444" uuid="$uuid_rule"><WhatToFind><MediaTypes selection="anyof" uuid="$uuid_media">$media_types</MediaTypes><Direction direction="either" uuid="$uuid_direction"/><ExecutableSettings uuid="$uuid_command"><Filename>$command</Filename><CmdLine>$parameters</CmdLine><ResponseList>$responses</ResponseList><Advanced mutex="false" timeout="$timeout"><LogFilePrefix>&gt;&gt;&gt;&gt;</LogFilePrefix><LogFilePostfix>&lt;&lt;&lt;&lt;</LogFilePostfix></Advanced></ExecutableSettings></WhatToFind><PrimaryActions><WhatToDo><Disposal disposal="$uuid_deliver" primaryCrypto="UNDEFINED" secondary="$uuid_none" secondaryCrypto="UNDEFINED" uuid="$uuid_deliver_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="allow" uuid="$uuid_deliver_web"/></WhatToDoWeb><WhatElseToDo/></PrimaryActions><ModifiedActions><WhatToDo><Disposal disposal="$uuid_modified_primary" primaryCrypto="UNDEFINED" secondary="$uuid_modified_secondary" secondaryCrypto="UNDEFINED" uuid="$uuid_modified_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="none" uuid="$uuid_modified_web"/></WhatToDoWeb><WhatElseToDo/></ModifiedActions><DetectedActions><WhatToDo><Disposal disposal="$uuid_detected_primary" primaryCrypto="UNDEFINED" secondary="$uuid_detected_secondary" secondaryCrypto="UNDEFINED" uuid="$uuid_detected_action"/></WhatToDo><WhatToDoWeb><PrimaryWebAction editable="true" type="none" uuid="$uuid_detected_web"/></WhatToDoWeb><WhatElseToDo/></DetectedActions></ExecutablePolicyRule>')
 TEMPLATE_MEDIA = Template('<MediaType$sub_types>$uuid</MediaType>')
-TEMPLATE_RETURN = Template('<Response action="$action" code="$return_code">$description</Response>')
+TEMPLATE_RESPONSE = Template('<Response action="$action" code="$return_code">$description</Response>')
 TEMPLATE_PARAMETER = Template("# $name\n# type: $type\n# description: $description\n\n$name = $value")
+
+TupleInfo = namedtuple("TupleInfo", "directory tag template_list template_item process_item")
+
+LIST_INFO = {
+    "address": TupleInfo(directory=DIR_ADDRESS, tag="AddressList", template_list=TEMPLATE_LIST_ADDRESS, template_item=TEMPLATE_ADDRESS, process_item=escape),
+    "filename": TupleInfo(directory=DIR_FILENAME, tag="FilenameList", template_list=TEMPLATE_LIST_FILENAME, template_item=TEMPLATE_FILENAME, process_item=escape),
+    "url": TupleInfo(directory=DIR_URL, tag="UrlList", template_list=TEMPLATE_LIST_URL, template_item=TEMPLATE_URL, process_item=escape),
+    "lexical": TupleInfo(directory=DIR_LEXICAL, tag="TextualAnalysis", template_list=TEMPLATE_LIST_LEXICAL, template_item=TEMPLATE_PHRASE, process_item=quoteattr)
+}
 
 CS_USER = "tomcat"
 CS_GROUP = "cs-adm"
@@ -68,9 +90,7 @@ KEY_LIST_LEXICAL = "list_lexical"
 KEY_PARAMETERS = "parameters"
 KEY_TIMEOUT = "timeout"
 KEY_MEDIA_TYPES = "media_types"
-KEY_RETURN_CODES = "return_codes"
-KEY_ACTION = "action"
-KEY_DESCRIPTION = "description"
+KEY_RESPONSES = "responses"
 KEY_DISPOSAL_ACTIONS = "disposal_actions"
 KEY_MODIFIED = "modified"
 KEY_DETECTED = "detected"
@@ -89,7 +109,17 @@ ACTION_DETECTED = "DETECTED"
 ACTION_MODIFIED = "MODIFIED"
 ACTION_ERROR = "NOT_CHECKED"
 
-ACTIONS = { ACTION_NONE, ACTION_DETECTED, ACTION_MODIFIED, ACTION_ERROR }
+RETURN_CODE_NONE = 100
+RETURN_CODE_DETECTED = 101
+RETURN_CODE_MODIFIED = 102
+RETURN_CODE_ERROR = 199
+
+RETURN_CODES = {
+    ACTION_NONE: RETURN_CODE_NONE,
+    ACTION_DETECTED: RETURN_CODE_DETECTED,
+    ACTION_MODIFIED: RETURN_CODE_MODIFIED,
+    ACTION_ERROR: RETURN_CODE_ERROR
+}
 
 DISPOSAL_NONE = "none"
 DISPOSAL_DELIVER = "deliver"
@@ -107,8 +137,8 @@ DICT_DISPOSAL = {
     "TagAndDeliver": DISPOSAL_TAG
 }
 
-PARAMETERS_NO_CONFIG = "%FILENAME% %LOGNAME%"
-PARAMETERS_CONFIG = '%FILENAME% %LOGNAME% "Config - {}"'
+PARAMETERS_NO_CONFIG = '%FILENAME% %LOGNAME% "External command - {}"'
+PARAMETERS_CONFIG = '-c "Config - {}" %FILENAME% %LOGNAME% "External command - {}"'
 TIMEOUT = 60
 
 PARAMETER_TYPE = "type"
@@ -116,11 +146,10 @@ PARAMETER_DESCRIPTION = "description"
 PARAMETER_VALUE = "value"
 
 TupleMediaType = namedtuple("TupleMediaType", "uuid sub_types")
-TupleResult = namedtuple("TupleResult", "action description")
 TupleAction = namedtuple("TupleAction", "primary secondary")
 TupleDisposalAction = namedtuple("TupleDisposalAction", "detected modified")
 TupleParameter = namedtuple("TupleParameter", "type description value")
-TupleRule = namedtuple("TupleRule", "packages modules list_address list_filename list_url list_lexical parameters timeout media_types return_codes disposal_actions config")
+TupleRule = namedtuple("TupleRule", "packages modules list_address list_filename list_url list_lexical parameters timeout media_types responses disposal_actions config")
 
 @enum.unique
 class ReturnCode(enum.IntEnum):
@@ -295,7 +324,7 @@ def get_commands():
     :rtype: dict
     """
     try:
-        readme = urlopen(URL_README).read().decode("utf-8")
+        readme = urlopen(URL_README).read().decode(CHARSET_UTF8)
     except Exception:
         raise Exception("Cannot download readme file '{}'".format(URL_README))
 
@@ -391,52 +420,54 @@ def get_disposal_actions():
 
     return handler.getDisposalActions()
 
-def create_lists(set_name, template, directory, tag):
+def create_list(type_list, name_list, list_item, replace=True):
     """
-    Create Clearswift item list.
+    Create/replace CS list.
 
-    :type set_name: set
-    :type template: Template
-    :type directory: Path
-    :type tag: str
+    :type type_list: str
+    :type name_list: str
+    :type list_item: list
+    :type replace: bool
     """
-    for name in set_name - get_names(directory, tag):
+    info = LIST_INFO[type_list]
+
+    handler = HandlerName(info.tag)
+
+    parser = make_parser()
+    parser.setContentHandler(handler)
+
+    for entry in info.directory.iterdir():
+        if entry.is_file() and entry.suffix == ".xml":
+            try:
+                parser.parse(str(entry))
+            except SAXExceptionFinished:
+                pass
+
+            name = handler.getName()
+
+            if name == name_list:
+                if replace:
+                    uuid = entry.stem
+                    file_list = info.directory.joinpath("{}.xml".format(uuid))
+
+                    break
+                else:
+                    return
+    else:
         while True:
             uuid = generate_uuid()
-            file_list = directory.joinpath("{}.xml".format(uuid))
+            file_list = info.directory.joinpath("{}.xml".format(uuid))
 
             if not file_list.exists():
                 break
 
-        try:
-            with open(file_list, "w") as f:
-                f.write(template.substitute(name=quoteattr(name), uuid=uuid))
+    try:
+        with open(file_list, "w") as f:
+            f.write(info.template_list.substitute(name=quoteattr(name_list), uuid=uuid, count=len(list_item), items="".join([ info.template_item.substitute(item=info.process_item(item), uuid=generate_uuid()) for item in list_item ])))
 
-            chown(file_list, user=CS_USER, group=CS_GROUP)
-        except Exception:
-            raise Exception("Cannot write list file '{}'".format(file_list))
-
-def create_lexical_lists(set_name):
-    """
-    Create Clearswift lexical expression list.
-
-    :type set_name: set
-    """
-    for name in set_name - get_names(DIR_LEXICAL, "TextualAnalysis"):
-        while True:
-            uuid = generate_uuid()
-            file_lexical = DIR_LEXICAL.joinpath("{}.xml".format(uuid))
-
-            if not file_lexical.exists():
-                break
-
-        try:
-            with open(file_lexical, "w") as f:
-                f.write(TEMPLATE_LEXICAL.substitute(count="1", name=quoteattr(name), uuid=uuid, phrases=TEMPLATE_PHRASE.substitute(text=quoteattr("dummy"), uuid=generate_uuid())))
-
-            chown(file_lexical, user=CS_USER, group=CS_GROUP)
-        except Exception:
-            raise Exception("Cannot write lexical list file '{}'".format(file_lexical))
+        chown(file_list, user=CS_USER, group=CS_GROUP)
+    except Exception:
+        raise Exception("Cannot write list file '{}'".format(file_list))
 
 def list2set(list_in):
     """
@@ -455,22 +486,23 @@ def list2set(list_in):
 
     return set_out
 
-def parse_config(str_config):
+def parse_config(command, configuration):
     """
     Parse external command config.
 
-    :type str_config: str
+    :type command: str
+    :type configuration: str
     :rtype: dict
     """
     try:
-        dict_config = json.loads(str_config)
+        dict_config = json.loads(configuration)
     except Exception:
         raise Exception("Config not valid JSON format")
 
-    config_command = dict()
+    configuration = dict()
 
     for (name, rule) in dict_config.items():
-        if name in config_command:
+        if name in configuration:
             raise Exception("Duplicate rule name '{}'".format(name))
 
         if KEY_MEDIA_TYPES in rule:
@@ -494,32 +526,19 @@ def parse_config(str_config):
         else:
             raise Exception("Media types missing from config")
 
-        if KEY_RETURN_CODES in rule:
-            return_codes = dict()
+        if KEY_RESPONSES in rule:
+            responses = dict()
 
-            for (return_code, result) in rule[KEY_RETURN_CODES].items():
-                try:
-                    return_code = int(return_code)
-                except Exception:
-                    raise Exception("Non-integer return code '{}'".format(return_code))
+            for (action, description) in rule[KEY_RESPONSES].items():
+                if action not in RETURN_CODES:
+                    raise Exception("Invalid action '{}'".format(action))
 
-                if return_code in return_codes:
-                    raise Exception("Duplicate return code '{}'".format(return_code))
+                if action in responses:
+                    raise Exception("Duplicate action '{}'".format(action))
 
-                if not KEY_ACTION in result:
-                    raise Exception("Return code '{}' missing action".format(return_code))
-
-                if not KEY_DESCRIPTION in result:
-                    raise Exception("Return code '{}' missing description".format(return_code))
-
-                action = result[KEY_ACTION]
-
-                if action not in ACTIONS:
-                    raise Exception("Return code '{}' has invalid action '{}'".format(return_code, action))
-
-                return_codes[return_code] = TupleResult(action=action, description=result[KEY_DESCRIPTION])
+                responses[action] = description
         else:
-            raise Exception("Return codes missing from config")
+            raise Exception("Responses missing from config")
 
         if KEY_DISPOSAL_ACTIONS in rule:
             disposal_actions = DICT_DISPOSAL.values()
@@ -590,48 +609,79 @@ def parse_config(str_config):
         else:
             config = None
 
-        config_command[name] = TupleRule(
+        configuration[name] = TupleRule(
             packages=list2set(rule.get(KEY_PACKAGES)),
             modules=list2set(rule.get(KEY_MODULES)),
             list_address=list2set(rule.get(KEY_LIST_ADDRESS)),
             list_filename=list2set(rule.get(KEY_LIST_FILENAME)),
             list_url=list2set(rule.get(KEY_LIST_URL)),
             list_lexical=list2set(rule.get(KEY_LIST_LEXICAL)),
-            parameters=rule.get(KEY_PARAMETERS, PARAMETERS_CONFIG.format(name) if KEY_CONFIG in rule else PARAMETERS_NO_CONFIG),
+            parameters=rule.get(KEY_PARAMETERS, PARAMETERS_CONFIG.format(name, command) if KEY_CONFIG in rule else PARAMETERS_NO_CONFIG.format(command)),
             timeout=rule.get(KEY_TIMEOUT, TIMEOUT),
             media_types=media_types,
-            return_codes=return_codes,
+            responses=responses,
             disposal_actions=disposal_actions,
             config=config
         )
 
-    return config_command
+    return configuration
 
 def download_script(command):
     """
     Download external command script.
 
     :type command: str
+    :rtype: str
     """
-    file_script = DIR_SCRIPTS.joinpath("{}.py".format(command))
-
     url_script = "{}/{}/{}.py".format(URL_REPO, command, command)
 
     try:
-        urlretrieve(url_script, file_script)
+        script = urlopen(url_script).read().decode(CHARSET_UTF8)
     except Exception:
-        raise Exception("Cannot download script '{}'".format(url_script))
+        raise Exception("Cannot download external command script '{}'".format(url_script))
 
-    chmod(file_script, 0o755)
+    return script
 
-def command_list(_, command_description):
+def install_updates(set_command, set_lexical, new_install=False):
+    """
+    Install external command script, library and Python dependencies and update currently installed external commands.
+
+    :type set_command: set
+    :type set_lexial: set
+    :type new_install: bool
+    """
+    set_installed = { command for command in set_command if NAME_COMMAND.format(command) in set_lexical }
+
+    if set_installed or new_install:
+        for module in MODULES_LIBRARY:
+            try:
+                run([ args.interpreter, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
+            except Exception:
+                raise Exception("Cannot install Python module '{}'".format(module))
+
+        try:
+            urlretrieve(URL_COMMAND, FILE_COMMAND)
+        except Exception:
+            raise Exception("Cannot download external command script '{}' to file '{}'".format(URL_COMMAND, FILE_COMMAND))
+
+        try:
+            library = urlopen(URL_LIBRARY).read().decode(CHARSET_UTF8)
+        except Exception:
+            raise Exception("Cannot download external command library '{}'".format(URL_LIBRARY))
+
+        create_list("lexical", NAME_LIBRARY, [ library, ])
+
+    for command in set_installed:
+        create_list("lexical", NAME_COMMAND.format(command), [ download_script(command), ])
+
+def command_list(_, command_info):
     """
     List available external commands.
 
-    :type command_description: dict
+    :type command_info: dict
     """
-    for command in sorted(command_description.keys()):
-        print("{}\t\t{}".format(command, command_description[command]))
+    for command in sorted(command_info.keys()):
+        print("{}\t\t{}".format(command, command_info[command]))
 
 def command_info(args, _):
     """
@@ -643,43 +693,57 @@ def command_info(args, _):
         url_readme = "{}/{}/{}".format(URL_REPO, command, FILE_README)
 
         try:
-            readme = urlopen(url_readme).read().decode("utf-8")
+            readme = urlopen(url_readme).read().decode(CHARSET_UTF8)
         except Exception:
             raise Exception("Cannot download readme file '{}'".format(url_readme))
 
         print(readme)
 
-def command_install(args, command_description):
+def command_install(args, command_info):
     """
     Install external commands.
 
     :type args: argparse.Namespace
-    :type command_description: dict
+    :type command_info: dict
     """
+    set_lexical = get_names(DIR_LEXICAL, "TextualAnalysis")
+
+    duplicate = { NAME_COMMAND.format(command) for command in args.command } & set_lexical
+
+    if duplicate:
+        raise Exception("External command scripts {} already exist".format(str(duplicate)[1:-1]))
+
     dict_media_type = get_media_types()
 
     dict_disposal_action = get_disposal_actions()
 
-    command_update(args, command_description)
+    install_updates(command_info.keys(), set_lexical, new_install=True)
 
     for command in args.command:
+        script = download_script(command)
+
         url_config = "{}/{}/{}".format(URL_REPO, command, FILE_CONFIG)
 
         try:
-            config = urlopen(url_config).read().decode("utf-8")
+            config = urlopen(url_config).read().decode(CHARSET_UTF8)
         except Exception:
-            raise Exception("Cannot download config file '{}'".format(url_config))
+            raise Exception("Cannot download external command configuration '{}'".format(url_config))
 
-        config = parse_config(config)
+        config = parse_config(command, config)
 
         set_rule = get_names(DIR_RULES, "ExecutablePolicyRule")
 
-        duplicate_rules = config.keys() & set_rule
+        duplicate = config.keys() & set_rule
 
-        if duplicate_rules:
-            raise Exception("Policy rules {} already exist".format(str(duplicate_rules)[1:-1]))
+        if duplicate:
+            raise Exception("Policy rules {} already exist".format(str(duplicate)[1:-1]))
 
-        download_script(command)
+        duplicate = { NAME_CONFIG.format(name) for name in config.keys() } & set_lexical
+
+        if duplicate:
+            raise Exception("External command configurations {} already exist".format(str(duplicate)[1:-1]))
+
+        create_list("lexical", NAME_COMMAND.format(command), [ script, ])
 
         for (name, rule) in config.items():
             if rule.packages:
@@ -692,7 +756,7 @@ def command_install(args, command_description):
             if rule.modules:
                 for module in rule.modules:
                     try:
-                        run([ sys.executable, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
+                        run([ args.interpreter, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
                     except Exception:
                         raise Exception("Cannot install Python module '{}'".format(module))
 
@@ -709,51 +773,30 @@ def command_install(args, command_description):
                             with open(FILE_DISPOSAL, "r+b") as f:
                                 f.seek(-21, SEEK_END)
 
-                                f.write(TEMPLATE_AREA.substitute(name=quoteattr(action[5:]), uuid=uuid).encode("utf-8"))
+                                f.write(TEMPLATE_AREA.substitute(name=quoteattr(action[5:]), uuid=uuid).encode(CHARSET_UTF8))
                         except Exception:
                             raise Exception("Cannot write disposal actions file '{}'".format(FILE_DISPOSAL))
 
                         dict_disposal_action[action] = uuid
 
+            if rule.config:
+                create_list("lexical", NAME_CONFIG.format(name), [ TEMPLATE_PARAMETER.substitute(name=parameter, type=rule.config[parameter].type, description=rule.config[parameter].description, value=rule.config[parameter].value) for parameter in sorted(rule.config.keys()) ])
+
             if rule.list_address:
-                create_lists(rule.list_address, TEMPLATE_ADDRESS, DIR_ADDRESS, "AddressList")
+                for name_list in rule.list_address:
+                    create_list("address", name_list, [ "dummy@dummy.com", ], replace=False)
 
             if rule.list_filename:
-                create_lists(rule.list_filename, TEMPLATE_FILENAME, DIR_FILENAME, "FilenameList")
+                for name_list in rule.list_filename:
+                    create_list("filename", name_list, [ "dummy", ], replace=False)
 
             if rule.list_url:
-                create_lists(rule.list_url, TEMPLATE_URL, DIR_URL, "UrlList")
+                for name_list in rule.list_url:
+                    create_list("url", name_list, [ "dummy.com", ], replace=False)
 
             if rule.list_lexical:
-                create_lexical_lists(rule.list_lexical)
-
-            if rule.config:
-                while True:
-                    uuid = generate_uuid()
-                    file_lexical = DIR_LEXICAL.joinpath("{}.xml".format(uuid))
-
-                    if not file_lexical.exists():
-                        break
-
-                try:
-                    with open(file_lexical, "w") as f:
-                        f.write(TEMPLATE_LEXICAL.substitute(
-                            count=str(len(rule.config)),
-                            name=quoteattr("Config - {}".format(name)),
-                            uuid=uuid,
-                            phrases="".join([ TEMPLATE_PHRASE.substitute(
-                                text=quoteattr(TEMPLATE_PARAMETER.substitute(
-                                    name=parameter,
-                                    type=rule.config[parameter].type,
-                                    description=rule.config[parameter].description,
-                                    value=rule.config[parameter].value)),
-                                uuid=generate_uuid()
-                            ) for parameter in sorted(rule.config.keys()) ])
-                        ))
-
-                    chown(file_lexical, user=CS_USER, group=CS_GROUP)
-                except Exception:
-                    raise Exception("Cannot write config lexical list file '{}'".format(file_lexical))
+                for name_list in rule.list_lexical:
+                    create_list("lexical", name_list, [ "dummy", ], replace=False)
 
             while True:
                 uuid = generate_uuid()
@@ -774,13 +817,13 @@ def command_install(args, command_description):
                         uuid_media=generate_uuid(),
                         uuid_direction=generate_uuid(),
                         uuid_command=generate_uuid(),
-                        command=DIR_SCRIPTS.joinpath("{}.py".format(command)),
-                        parameters=escape(rule.parameters),
-                        return_codes="".join([ TEMPLATE_RETURN.substitute(
-                            action=result.action,
-                            return_code=return_code,
-                            description=result.description
-                        ) for (return_code, result) in rule.return_codes.items() ]),
+                        command=escape(args.interpreter),
+                        parameters=escape("{} {}".format(DIR_SCRIPTS.joinpath(FILE_COMMAND), rule.parameters)),
+                        responses="".join([ TEMPLATE_RESPONSE.substitute(
+                            action=action,
+                            return_code=RETURN_CODES[action],
+                            description=description
+                        ) for (action, description) in rule.responses.items() ]),
                         timeout=rule.timeout,
                         uuid_deliver=dict_disposal_action["deliver"],
                         uuid_none=dict_disposal_action["none"],
@@ -818,34 +861,27 @@ def command_install(args, command_description):
         except Exception:
             raise Exception("Cannot restart Tomcat service")
 
-def command_update(_, command_description):
+def command_update(args, command_info):
     """
     Update installed external commands.
 
-    :type command_description: dict
+    :type command_info: dict
     """
-    for module in MODULES_LIBRARY:
+    install_updates(command_info.keys(), get_names(DIR_LEXICAL, "TextualAnalysis"))
+
+    if args.reload:
         try:
-            run([ sys.executable, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
+            run("source /etc/profile.d/cs-vars.sh; /opt/cs-gateway/bin/cs-servicecontrol restart tomcat", shell=True, stdout=DEVNULL, stderr=DEVNULL, check=True)
         except Exception:
-            raise Exception("Cannot install Python module '{}'".format(module))
-
-    try:
-        urlretrieve(URL_LIBRARY, FILE_LIBRARY)
-    except Exception:
-        raise Exception("Cannot download library '{}'".format(URL_LIBRARY))
-
-    for command in command_description.keys():
-        if DIR_SCRIPTS.joinpath("{}.py".format(command)).exists():
-            download_script(command)
+            raise Exception("Cannot restart Tomcat service")
 
 def main(args):
-    command_description = get_commands()
+    command_info = get_commands()
 
     if hasattr(args, "command"):
         args.command = set(args.command)
 
-        invalid_commands = args.command - command_description.keys()
+        invalid_commands = args.command - command_info.keys()
 
         if invalid_commands:
             eprint("Invalid external commands {}".format(str(invalid_commands)[1:-1]))
@@ -853,7 +889,7 @@ def main(args):
             return ReturnCode.ERROR
 
     try:
-        args.action(args, command_description)
+        args.action(args, command_info)
     except Exception as ex:
         eprint(ex)
 
@@ -874,10 +910,12 @@ if __name__ == "__main__":
     parser_install = subparsers.add_parser("install", help="install external commands")
     parser_install.set_defaults(action=command_install)
     parser_install.add_argument("command", metavar="COMMAND", type=str, nargs="+", help="one or more external commands")
+    parser_install.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=str, default=DEFAULT_INTERPRETER, help="Python 3 interpreter used for running external command (default={})".format(DEFAULT_INTERPRETER))
     parser_install.add_argument("-r", "--reload", action="store_true", help="reload Clearswift web interface")
 
     parser_update = subparsers.add_parser("update", help="update all installed external commands to latest version")
     parser_update.set_defaults(action=command_update)
+    parser_update.add_argument("-r", "--reload", action="store_true", help="reload Clearswift web interface")
 
     args = parser.parse_args()
 
