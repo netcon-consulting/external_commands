@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V1.5.1
+# external_commands.py V1.6.0
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -25,7 +25,7 @@ DESCRIPTION = "install and update external commands for Clearswift SEG 5"
 FILE_README = "README.md"
 FILE_CONFIG = "config.json"
 
-URL_REPO = "https://raw.githubusercontent.com/netcon-consulting/clearswift-external-commands/master"
+URL_REPO = "https://raw.githubusercontent.com/netcon-consulting/clearswift-external-commands/old2"
 URL_README = "{}/{}".format(URL_REPO, FILE_README)
 URL_LIBRARY = "https://raw.githubusercontent.com/netcon-consulting/netcon.py/master/netcon.py"
 
