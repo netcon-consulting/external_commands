@@ -1,4 +1,4 @@
-external_commands.py V2.0.0
+external_commands.py V2.0.1
 ===========================
 
 Installation script for Clearswift external commands (see https://github.com/netcon-consulting/clearswift-external-commands).

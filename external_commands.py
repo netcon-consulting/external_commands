@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V2.0.0
+# external_commands.py V2.0.1
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -642,10 +642,11 @@ def download_script(command):
 
     return script
 
-def install_updates(set_command, set_lexical, new_install=False):
+def install_updates(interpreter, set_command, set_lexical, new_install=False):
     """
     Install external command script, library and Python dependencies and update currently installed external commands.
 
+    :type interpreter: Path
     :type set_command: set
     :type set_lexial: set
     :type new_install: bool
@@ -655,7 +656,7 @@ def install_updates(set_command, set_lexical, new_install=False):
     if set_installed or new_install:
         for module in MODULES_LIBRARY:
             try:
-                run([ args.interpreter, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
+                run([ "./{}".format(interpreter.name), "-m", "pip", "install" , module ], cwd=interpreter.parent, stdout=DEVNULL, stderr=DEVNULL, check=True)
             except Exception:
                 raise Exception("Cannot install Python module '{}'".format(module))
 
@@ -717,7 +718,9 @@ def command_install(args, command_info):
 
     dict_disposal_action = get_disposal_actions()
 
-    install_updates(command_info.keys(), set_lexical, new_install=True)
+    interpreter = Path(args.interpreter)
+
+    install_updates(interpreter, command_info.keys(), set_lexical, new_install=True)
 
     for command in args.command:
         script = download_script(command)
@@ -756,7 +759,7 @@ def command_install(args, command_info):
             if rule.modules:
                 for module in rule.modules:
                     try:
-                        run([ args.interpreter, "-m", "pip", "install" , module ], stdout=DEVNULL, stderr=DEVNULL, check=True)
+                        run([ "./{}".format(interpreter.name), "-m", "pip", "install" , module ], cwd=interpreter.parent, stdout=DEVNULL, stderr=DEVNULL, check=True)
                     except Exception:
                         raise Exception("Cannot install Python module '{}'".format(module))
 
@@ -867,7 +870,7 @@ def command_update(args, command_info):
 
     :type command_info: dict
     """
-    install_updates(command_info.keys(), get_names(DIR_LEXICAL, "TextualAnalysis"))
+    install_updates(Path(args.interpreter), command_info.keys(), get_names(DIR_LEXICAL, "TextualAnalysis"))
 
     if args.reload:
         try:
@@ -915,6 +918,7 @@ if __name__ == "__main__":
 
     parser_update = subparsers.add_parser("update", help="update all installed external commands to latest version")
     parser_update.set_defaults(action=command_update)
+    parser_update.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=str, default=DEFAULT_INTERPRETER, help="Python 3 interpreter used for running external command (default={})".format(DEFAULT_INTERPRETER))
     parser_update.add_argument("-r", "--reload", action="store_true", help="reload Clearswift web interface")
 
     args = parser.parse_args()
