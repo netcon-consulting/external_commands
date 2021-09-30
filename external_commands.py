@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V2.0.1
+# external_commands.py V2.1.0
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -24,7 +24,8 @@ DESCRIPTION = "install and update external commands for Clearswift SEG 5"
 
 CHARSET_UTF8 = "utf-8"
 
-DEFAULT_INTERPRETER = "/usr/bin/python3"
+DEFAULT_DIRECTORY = Path("/opt/netcon_scripts")
+DEFAULT_INTERPRETER = Path("/usr/bin/python3")
 
 FILE_README = "README.md"
 FILE_CONFIG = "config.json"
@@ -46,8 +47,6 @@ DIR_ADDRESS = DIR_POLICY.joinpath("addresslists")
 DIR_FILENAME = DIR_POLICY.joinpath("filenames")
 DIR_URL = DIR_POLICY.joinpath("urllists")
 DIR_LEXICAL = DIR_POLICY.joinpath("ta")
-
-DIR_SCRIPTS = Path("/opt/netcon_scripts")
 
 FILE_DISPOSAL = DIR_POLICY.joinpath("disposals.xml")
 FILE_MEDIATYPES = Path("/opt/cs-gateway/cfg/ui/mediatypes.xml")
@@ -642,11 +641,12 @@ def download_script(command):
 
     return script
 
-def install_updates(interpreter, set_command, set_lexical, new_install=False):
+def install_updates(interpreter, directory, set_command, set_lexical, new_install=False):
     """
     Install external command script, library and Python dependencies and update currently installed external commands.
 
     :type interpreter: Path
+    :type directory: Path
     :type set_command: set
     :type set_lexial: set
     :type new_install: bool
@@ -661,9 +661,9 @@ def install_updates(interpreter, set_command, set_lexical, new_install=False):
                 raise Exception("Cannot install Python module '{}'".format(module))
 
         try:
-            urlretrieve(URL_COMMAND, FILE_COMMAND)
+            urlretrieve(URL_COMMAND, directory.joinpath(FILE_COMMAND))
         except Exception:
-            raise Exception("Cannot download external command script '{}' to file '{}'".format(URL_COMMAND, FILE_COMMAND))
+            raise Exception("Cannot download external command script '{}' to file '{}'".format(URL_COMMAND, directory.joinpath(FILE_COMMAND)))
 
         try:
             library = urlopen(URL_LIBRARY).read().decode(CHARSET_UTF8)
@@ -718,9 +718,7 @@ def command_install(args, command_info):
 
     dict_disposal_action = get_disposal_actions()
 
-    interpreter = Path(args.interpreter)
-
-    install_updates(interpreter, command_info.keys(), set_lexical, new_install=True)
+    install_updates(args.interpreter, args.directory, command_info.keys(), set_lexical, new_install=True)
 
     for command in args.command:
         script = download_script(command)
@@ -759,7 +757,7 @@ def command_install(args, command_info):
             if rule.modules:
                 for module in rule.modules:
                     try:
-                        run([ "./{}".format(interpreter.name), "-m", "pip", "install" , module ], cwd=interpreter.parent, stdout=DEVNULL, stderr=DEVNULL, check=True)
+                        run([ "./{}".format(args.interpreter.name), "-m", "pip", "install" , module ], cwd=args.interpreter.parent, stdout=DEVNULL, stderr=DEVNULL, check=True)
                     except Exception:
                         raise Exception("Cannot install Python module '{}'".format(module))
 
@@ -821,7 +819,7 @@ def command_install(args, command_info):
                         uuid_direction=generate_uuid(),
                         uuid_command=generate_uuid(),
                         command=escape(args.interpreter),
-                        parameters=escape("{} {}".format(DIR_SCRIPTS.joinpath(FILE_COMMAND), rule.parameters)),
+                        parameters=escape("{} {}".format(args.directory.joinpath(FILE_COMMAND), rule.parameters)),
                         responses="".join([ TEMPLATE_RESPONSE.substitute(
                             action=action,
                             return_code=RETURN_CODES[action],
@@ -870,7 +868,7 @@ def command_update(args, command_info):
 
     :type command_info: dict
     """
-    install_updates(Path(args.interpreter), command_info.keys(), get_names(DIR_LEXICAL, "TextualAnalysis"))
+    install_updates(args.interpreter, args.directory, command_info.keys(), get_names(DIR_LEXICAL, "TextualAnalysis"))
 
     if args.reload:
         try:
@@ -879,6 +877,28 @@ def command_update(args, command_info):
             raise Exception("Cannot restart Tomcat service")
 
 def main(args):
+    if hasattr(args, "directory"):
+        if not args.directory.exists():
+            eprint("Path '{}' does not exist".format(args.directory))
+
+            return ReturnCode.ERROR
+
+        if not args.directory.is_dir():
+            eprint("Path '{}' not a directory".format(args.directory))
+
+            return ReturnCode.ERROR
+
+    if hasattr(args, "interpreter"):
+        if not args.interpreter.exists():
+            eprint("Path '{}' does not exist".format(args.interpreter))
+
+            return ReturnCode.ERROR
+
+        if not args.interpreter.is_file():
+            eprint("Path '{}' not a file".format(args.interpreter))
+
+            return ReturnCode.ERROR
+
     command_info = get_commands()
 
     if hasattr(args, "command"):
@@ -913,12 +933,14 @@ if __name__ == "__main__":
     parser_install = subparsers.add_parser("install", help="install external commands")
     parser_install.set_defaults(action=command_install)
     parser_install.add_argument("command", metavar="COMMAND", type=str, nargs="+", help="one or more external commands")
-    parser_install.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=str, default=DEFAULT_INTERPRETER, help="Python 3 interpreter used for running external command (default={})".format(DEFAULT_INTERPRETER))
+    parser_install.add_argument("-d", "--directory", metavar="DIRECTORY", type=Path, default=DEFAULT_DIRECTORY, help="directory for storing external command script (default={})".format(DEFAULT_DIRECTORY))
+    parser_install.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=Path, default=DEFAULT_INTERPRETER, help="Python 3 interpreter used for running external command (default={})".format(DEFAULT_INTERPRETER))
     parser_install.add_argument("-r", "--reload", action="store_true", help="reload Clearswift web interface")
 
     parser_update = subparsers.add_parser("update", help="update all installed external commands to latest version")
     parser_update.set_defaults(action=command_update)
-    parser_update.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=str, default=DEFAULT_INTERPRETER, help="Python 3 interpreter used for running external command (default={})".format(DEFAULT_INTERPRETER))
+    parser_update.add_argument("-d", "--directory", metavar="DIRECTORY", type=Path, default=DEFAULT_DIRECTORY, help="directory for storing external command script (default={})".format(DEFAULT_DIRECTORY))
+    parser_update.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=Path, default=DEFAULT_INTERPRETER, help="Python 3 interpreter used for running external command (default={})".format(DEFAULT_INTERPRETER))
     parser_update.add_argument("-r", "--reload", action="store_true", help="reload Clearswift web interface")
 
     args = parser.parse_args()
