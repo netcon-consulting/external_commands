@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V2.1.0
+# external_commands.py V2.1.1
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -818,7 +818,7 @@ def command_install(args, command_info):
                         uuid_media=generate_uuid(),
                         uuid_direction=generate_uuid(),
                         uuid_command=generate_uuid(),
-                        command=escape(args.interpreter),
+                        command=escape(str(args.interpreter)),
                         parameters=escape("{} {}".format(args.directory.joinpath(FILE_COMMAND), rule.parameters)),
                         responses="".join([ TEMPLATE_RESPONSE.substitute(
                             action=action,
