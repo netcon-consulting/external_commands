@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V2.1.1
+# external_commands.py V2.2.0
 #
 # Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -51,6 +51,7 @@ DIR_LEXICAL = DIR_POLICY.joinpath("ta")
 FILE_DISPOSAL = DIR_POLICY.joinpath("disposals.xml")
 FILE_MEDIATYPES = Path("/opt/cs-gateway/cfg/ui/mediatypes.xml")
 FILE_STATUS = DIR_UICONFIG.joinpath("trail.xml")
+FILE_APPLY = Path("/opt/cs-gateway/upgradesignals/applyconfiguration")
 
 MODULES_LIBRARY = { "toml", "pyzipper", "beautifulsoup4", "html5lib", "dnspython" }
 
@@ -675,6 +676,27 @@ def install_updates(interpreter, directory, set_command, set_lexical, new_instal
     for command in set_installed:
         create_list("lexical", NAME_COMMAND.format(command), [ download_script(command), ])
 
+def reload_webgui():
+    """
+    Reload Clearswift web interface.
+    """
+    try:
+        run("source /etc/profile.d/cs-vars.sh; /opt/cs-gateway/bin/cs-servicecontrol restart tomcat", shell=True, stdout=DEVNULL, stderr=DEVNULL, check=True)
+    except Exception:
+        raise Exception("Cannot restart Tomcat service")
+
+def apply_configuration():
+    """
+    Apply Clearswift configuration changes and reload web interface.
+    """
+    try:
+        with open(FILE_APPLY, "w") as f:
+            f.write("reason:upgrade\ndetail:applied by external_commands")
+    except Exception:
+        raise Exception("Cannot write apply configuration file '{}'".format(FILE_APPLY))
+
+    reload_webgui()
+
 def command_list(_, command_info):
     """
     List available external commands.
@@ -856,11 +878,10 @@ def command_install(args, command_info):
     except Exception:
         raise Exception("Cannot write status file '{}'".format(FILE_STATUS))
 
-    if args.reload:
-        try:
-            run("source /etc/profile.d/cs-vars.sh; /opt/cs-gateway/bin/cs-servicecontrol restart tomcat", shell=True, stdout=DEVNULL, stderr=DEVNULL, check=True)
-        except Exception:
-            raise Exception("Cannot restart Tomcat service")
+    if args.apply:
+        apply_configuration()
+    elif args.reload:
+        reload_webgui()
 
 def command_update(args, command_info):
     """
@@ -870,11 +891,10 @@ def command_update(args, command_info):
     """
     install_updates(args.interpreter, args.directory, command_info.keys(), get_names(DIR_LEXICAL, "TextualAnalysis"))
 
-    if args.reload:
-        try:
-            run("source /etc/profile.d/cs-vars.sh; /opt/cs-gateway/bin/cs-servicecontrol restart tomcat", shell=True, stdout=DEVNULL, stderr=DEVNULL, check=True)
-        except Exception:
-            raise Exception("Cannot restart Tomcat service")
+    if args.apply:
+        apply_configuration()
+    elif args.reload:
+        reload_webgui()
 
 def main(args):
     if hasattr(args, "directory"):
@@ -936,12 +956,14 @@ if __name__ == "__main__":
     parser_install.add_argument("-d", "--directory", metavar="DIRECTORY", type=Path, default=DEFAULT_DIRECTORY, help="directory for storing external command script (default={})".format(DEFAULT_DIRECTORY))
     parser_install.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=Path, default=DEFAULT_INTERPRETER, help="Python 3 interpreter used for running external command (default={})".format(DEFAULT_INTERPRETER))
     parser_install.add_argument("-r", "--reload", action="store_true", help="reload Clearswift web interface")
+    parser_install.add_argument("-a", "--apply", action="store_true", help="apply Clearswift configuration changes (and reload web interface)")
 
     parser_update = subparsers.add_parser("update", help="update all installed external commands to latest version")
     parser_update.set_defaults(action=command_update)
     parser_update.add_argument("-d", "--directory", metavar="DIRECTORY", type=Path, default=DEFAULT_DIRECTORY, help="directory for storing external command script (default={})".format(DEFAULT_DIRECTORY))
     parser_update.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=Path, default=DEFAULT_INTERPRETER, help="Python 3 interpreter used for running external command (default={})".format(DEFAULT_INTERPRETER))
     parser_update.add_argument("-r", "--reload", action="store_true", help="reload Clearswift web interface")
+    parser_update.add_argument("-a", "--apply", action="store_true", help="apply Clearswift configuration changes (and reload web interface)")
 
     args = parser.parse_args()
 
