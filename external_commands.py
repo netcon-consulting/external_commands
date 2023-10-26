@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-# external_commands.py V2.2.0
+# external_commands.py V3.0.0
 #
-# Copyright (c) 2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
+# Copyright (c) 2021-2023 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
 
 import argparse
@@ -53,7 +53,9 @@ FILE_MEDIATYPES = Path("/opt/cs-gateway/cfg/ui/mediatypes.xml")
 FILE_STATUS = DIR_UICONFIG.joinpath("trail.xml")
 FILE_APPLY = Path("/opt/cs-gateway/upgradesignals/applyconfiguration")
 
-MODULES_LIBRARY = { "toml", "pyzipper", "beautifulsoup4", "html5lib", "dnspython" }
+MODULES_LIBRARY = { "toml", "pyzipper", "lxml", "html5lib", "dnspython" }
+
+TEMPLATE_PIP = Template("$interpreter -m pip install --upgrade $modules $$($interpreter -m pip list 2> /dev/null | tail -n +3 | cut -d ' ' -f1)")
 
 TEMPLATE_LIST_ADDRESS = Template('<?xml version="1.0" encoding="UTF-8" standalone="no"?><AddressList name=$name type="static" uuid="$uuid">$items</AddressList>')
 TEMPLATE_ADDRESS = Template("<Address>$item</Address>")
@@ -642,7 +644,7 @@ def download_script(command):
 
     return script
 
-def install_updates(interpreter, directory, set_command, set_lexical, new_install=False):
+def install_updates(interpreter, directory, set_command, set_lexical, command_install=False):
     """
     Install external command script, library and Python dependencies and update currently installed external commands.
 
@@ -650,16 +652,17 @@ def install_updates(interpreter, directory, set_command, set_lexical, new_instal
     :type directory: Path
     :type set_command: set
     :type set_lexial: set
-    :type new_install: bool
+    :type command_install: bool
     """
     set_installed = { command for command in set_command if NAME_COMMAND.format(command) in set_lexical }
 
-    if set_installed or new_install:
-        for module in MODULES_LIBRARY:
-            try:
-                run([ "./{}".format(interpreter.name), "-m", "pip", "install" , module ], cwd=interpreter.parent, stdout=DEVNULL, stderr=DEVNULL, check=True)
-            except Exception:
-                raise Exception("Cannot install Python module '{}'".format(module))
+    if set_installed or command_install:
+        modules = sorted(MODULES_LIBRARY)
+
+        try:
+            run(TEMPLATE_PIP.substitute(interpreter=interpreter, modules=" ".join(modules)), shell=True, stdout=DEVNULL, stderr=DEVNULL, check=True)
+        except Exception:
+            raise Exception("Cannot install Python modules {}".format(str(modules)[1:-1]))
 
         try:
             urlretrieve(URL_COMMAND, directory.joinpath(FILE_COMMAND))
@@ -740,7 +743,7 @@ def command_install(args, command_info):
 
     dict_disposal_action = get_disposal_actions()
 
-    install_updates(args.interpreter, args.directory, command_info.keys(), set_lexical, new_install=True)
+    install_updates(args.interpreter, args.directory, command_info.keys(), set_lexical, command_install=True)
 
     for command in args.command:
         script = download_script(command)
@@ -777,11 +780,12 @@ def command_install(args, command_info):
                         raise Exception("Cannot install package '{}'".format(package))
 
             if rule.modules:
-                for module in rule.modules:
-                    try:
-                        run([ "./{}".format(args.interpreter.name), "-m", "pip", "install" , module ], cwd=args.interpreter.parent, stdout=DEVNULL, stderr=DEVNULL, check=True)
-                    except Exception:
-                        raise Exception("Cannot install Python module '{}'".format(module))
+                modules = sorted(rule.modules)
+
+                try:
+                    run(TEMPLATE_PIP.substitute(interpreter=args.interpreter, modules=" ".join(modules)), shell=True, stdout=DEVNULL, stderr=DEVNULL, check=True)
+                except Exception:
+                    raise Exception("Cannot install Python modules {}".format(str(modules)[1:-1]))
 
             for disposal_action in rule.disposal_actions:
                 for action in disposal_action:
