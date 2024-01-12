@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-# external_commands.py V3.0.0
+# external_commands.py V3.0.1
 #
-# Copyright (c) 2021-2023 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
+# Copyright (c) 2021-2024 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
 
 import argparse
@@ -25,7 +25,7 @@ DESCRIPTION = "install and update external commands for Clearswift SEG 5"
 CHARSET_UTF8 = "utf-8"
 
 DEFAULT_DIRECTORY = Path("/opt/netcon_scripts")
-DEFAULT_INTERPRETER = Path("/usr/bin/python3")
+DEFAULT_INTERPRETER = Path(sys.executable)
 
 FILE_README = "README.md"
 FILE_CONFIG = "config.json"
@@ -725,6 +725,22 @@ def command_info(args, _):
 
         print(readme)
 
+def status_changed():
+    """
+    Set Clearswift configuration status to changed.
+    """
+    try:
+        with open(FILE_STATUS, "r") as f:
+            content = f.read()
+    except Exception:
+        raise Exception("Cannot read status file '{}'".format(FILE_STATUS))
+
+    try:
+        with open(FILE_STATUS, "w") as f:
+            f.write(content.replace(' changesMade="false" ', ' changesMade="true" '))
+    except Exception:
+        raise Exception("Cannot write status file '{}'".format(FILE_STATUS))
+
 def command_install(args, command_info):
     """
     Install external commands.
@@ -870,17 +886,7 @@ def command_install(args, command_info):
             except Exception:
                 raise Exception("Cannot write policy rule file '{}'".format(file_rule))
 
-    try:
-        with open(FILE_STATUS, "r") as f:
-            content = f.read()
-    except Exception:
-        raise Exception("Cannot read status file '{}'".format(FILE_STATUS))
-
-    try:
-        with open(FILE_STATUS, "w") as f:
-            f.write(content.replace(' changesMade="false" ', ' changesMade="true" '))
-    except Exception:
-        raise Exception("Cannot write status file '{}'".format(FILE_STATUS))
+    status_changed()
 
     if args.apply:
         apply_configuration()
@@ -894,6 +900,8 @@ def command_update(args, command_info):
     :type command_info: dict
     """
     install_updates(args.interpreter, args.directory, command_info.keys(), get_names(DIR_LEXICAL, "TextualAnalysis"))
+
+    status_changed()
 
     if args.apply:
         apply_configuration()
