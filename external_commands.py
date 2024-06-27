@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-# external_commands.py V3.0.1
+# external_commands.py V3.1.0
 #
 # Copyright (c) 2021-2024 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
 
-import argparse
-import enum
-import sys
+from argparse import ArgumentParser
+from enum import unique, IntEnum
+from sys import stderr, exit
 from pathlib import Path
 from string import Template
 from collections import namedtuple, Counter
@@ -17,12 +17,10 @@ from uuid import uuid4 as generate_uuid
 from os import chmod, SEEK_END
 from subprocess import run, DEVNULL
 from shutil import chown
-import json
+from json import loads
 from urllib.request import urlopen, urlretrieve
 
 DESCRIPTION = "install and update external commands for Clearswift SEG 5"
-
-CHARSET_UTF8 = "utf-8"
 
 DEFAULT_DIRECTORY = Path("/opt/netcon_scripts")
 DEFAULT_INTERPRETER = Path(sys.executable)
@@ -32,25 +30,25 @@ FILE_CONFIG = "config.json"
 FILE_COMMAND = "run_command.py"
 
 URL_REPO = "https://raw.githubusercontent.com/netcon-consulting/clearswift-external-commands/master"
-URL_README = "{}/{}".format(URL_REPO, FILE_README)
-URL_COMMAND = "{}/{}".format(URL_REPO, FILE_COMMAND)
-URL_LIBRARY = "{}/command_library.py".format(URL_REPO)
+URL_README = f"{URL_REPO}/{FILE_README}"
+URL_COMMAND = f"{URL_REPO}/{FILE_COMMAND}"
+URL_LIBRARY = f"{URL_REPO}/command_library.py"
 
 NAME_LIBRARY = "External command library"
 NAME_COMMAND = "External command - {}"
 NAME_CONFIG = "Config - {}"
 
 DIR_UICONFIG = Path("/var/cs-gateway/uicfg")
-DIR_POLICY = DIR_UICONFIG.joinpath("policy")
-DIR_RULES = DIR_POLICY.joinpath("rules")
-DIR_ADDRESS = DIR_POLICY.joinpath("addresslists")
-DIR_FILENAME = DIR_POLICY.joinpath("filenames")
-DIR_URL = DIR_POLICY.joinpath("urllists")
-DIR_LEXICAL = DIR_POLICY.joinpath("ta")
+DIR_POLICY = DIR_UICONFIG / "policy"
+DIR_RULES = DIR_POLICY / "rules"
+DIR_ADDRESS = DIR_POLICY / "addresslists"
+DIR_FILENAME = DIR_POLICY / "filenames"
+DIR_URL = DIR_POLICY / "urllists"
+DIR_LEXICAL = DIR_POLICY / "ta"
 
-FILE_DISPOSAL = DIR_POLICY.joinpath("disposals.xml")
+FILE_DISPOSAL = DIR_POLICY / "disposals.xml"
 FILE_MEDIATYPES = Path("/opt/cs-gateway/cfg/ui/mediatypes.xml")
-FILE_STATUS = DIR_UICONFIG.joinpath("trail.xml")
+FILE_STATUS = DIR_UICONFIG / "trail.xml"
 FILE_APPLY = Path("/opt/cs-gateway/upgradesignals/applyconfiguration")
 
 MODULES_LIBRARY = { "toml", "pyzipper", "lxml", "html5lib", "dnspython" }
@@ -153,8 +151,8 @@ TupleDisposalAction = namedtuple("TupleDisposalAction", "detected modified")
 TupleParameter = namedtuple("TupleParameter", "type description value")
 TupleRule = namedtuple("TupleRule", "packages modules list_address list_filename list_url list_lexical parameters timeout media_types responses disposal_actions config")
 
-@enum.unique
-class ReturnCode(enum.IntEnum):
+@unique
+class ReturnCode(IntEnum):
     """
     Return code.
 
@@ -164,8 +162,8 @@ class ReturnCode(enum.IntEnum):
     OK = 0
     ERROR = 1
 
-@enum.unique
-class MediaSubtype(enum.IntEnum):
+@unique
+class MediaSubtype(IntEnum):
     """
     Media sub-type.
 
@@ -238,7 +236,7 @@ class HandlerMediaTypes(handler.ContentHandler):
             mnemonic = attrs["mnemonic"]
 
             if mnemonic in self.dict_media_type:
-                raise SAXException("Duplicate media type mnemonic '{}'".format(mnemonic))
+                raise SAXException(f"Duplicate media type mnemonic '{mnemonic}'")
 
             self.dict_media_type[mnemonic] = TupleMediaType(attrs["uuid"], set())
 
@@ -285,17 +283,17 @@ class HandlerDisposalActions(handler.ContentHandler):
         if self.found:
             if name == "MessageArea" and "name" in attrs and "uuid" in attrs:
                 name_area = attrs["name"]
-                disposal = "hold:{}".format(name_area)
+                disposal = f"hold:{name_area}"
 
                 if disposal in self.dict_disposal_action:
-                    raise SAXException("Duplicate message area '{}'".format(name_area))
+                    raise SAXException(f"Duplicate message area '{name_area}'")
 
                 self.dict_disposal_action[disposal] = attrs["uuid"]
             elif name in DICT_DISPOSAL and "uuid" in attrs:
                 disposal = DICT_DISPOSAL[name]
 
                 if disposal in self.dict_disposal_action:
-                    raise SAXException("Duplicate disposal action '{}'".format(disposal))
+                    raise SAXException(f"Duplicate disposal action '{disposal}'")
 
                 self.dict_disposal_action[disposal] = attrs["uuid"]
         elif name == "DisposalCollection":
@@ -317,7 +315,7 @@ def eprint(*args, **kwargs):
     """
     Print to stderr.
     """
-    print(*args, file=sys.stderr, **kwargs)
+    print(*args, file=stderr, **kwargs)
 
 def get_commands():
     """
@@ -326,9 +324,9 @@ def get_commands():
     :rtype: dict
     """
     try:
-        readme = urlopen(URL_README).read().decode(CHARSET_UTF8)
+        readme = urlopen(URL_README).read().decode()
     except Exception:
-        raise Exception("Cannot download readme file '{}'".format(URL_README))
+        raise Exception(f"Cannot download readme file '{URL_README}'")
 
     list_readme = readme.split("\n")
 
@@ -351,7 +349,7 @@ def get_commands():
             command = split_line[0]
 
             if command in dict_command:
-                raise Exception("Duplicate command '{}'".format(command))
+                raise Exception(f"Duplicate command '{command}'")
 
             dict_command[command] = split_line[1]
 
@@ -450,7 +448,7 @@ def create_list(type_list, name_list, list_item, replace=True):
             if name == name_list:
                 if replace:
                     uuid = entry.stem
-                    file_list = info.directory.joinpath("{}.xml".format(uuid))
+                    file_list = info.directory / f"{uuid}.xml"
 
                     break
                 else:
@@ -458,7 +456,7 @@ def create_list(type_list, name_list, list_item, replace=True):
     else:
         while True:
             uuid = generate_uuid()
-            file_list = info.directory.joinpath("{}.xml".format(uuid))
+            file_list = info.directory / f"{uuid}.xml"
 
             if not file_list.exists():
                 break
@@ -469,7 +467,7 @@ def create_list(type_list, name_list, list_item, replace=True):
 
         chown(file_list, user=CS_USER, group=CS_GROUP)
     except Exception:
-        raise Exception("Cannot write list file '{}'".format(file_list))
+        raise Exception(f"Cannot write list file '{file_list}'")
 
 def list2set(list_in):
     """
@@ -484,7 +482,7 @@ def list2set(list_in):
     set_out = set(list_in)
 
     if len(set_out) < len(list_in):
-        raise Exception("Duplicate list items {}".format(str({ item for (item, count) in Counter(list_in).items() if count > 1 })[1:-1]))
+        raise Exception(f"Duplicate list items {str({ item for (item, count) in Counter(list_in).items() if count > 1 })[1:-1]}")
 
     return set_out
 
@@ -497,7 +495,7 @@ def parse_config(command, configuration):
     :rtype: dict
     """
     try:
-        dict_config = json.loads(configuration)
+        dict_config = loads(configuration)
     except Exception:
         raise Exception("Config not valid JSON format")
 
@@ -505,24 +503,24 @@ def parse_config(command, configuration):
 
     for (name, rule) in dict_config.items():
         if name in configuration:
-            raise Exception("Duplicate rule name '{}'".format(name))
+            raise Exception(f"Duplicate rule name '{name}'")
 
         if KEY_MEDIA_TYPES in rule:
             media_types = dict()
 
             for (mnemonic, list_subtype) in rule[KEY_MEDIA_TYPES].items():
                 if mnemonic in media_types:
-                    raise Exception("Duplicate media type '{}'".format(mnemonic))
+                    raise Exception(f"Duplicate media type '{mnemonic}'")
 
                 if list_subtype is None:
-                    raise Exception("Media type '{}' missing sub-types".format(mnemonic))
+                    raise Exception(f"Media type '{mnemonic}' missing sub-types")
 
                 set_subtype = list2set(list_subtype)
 
                 invalid_subtype = set_subtype - MEDIA_SUBTYPE.keys()
 
                 if invalid_subtype:
-                    raise Exception("Invalid media sub-types '{}'".format(invalid_subtype))
+                    raise Exception(f"Invalid media sub-types '{invalid_subtype}'")
 
                 media_types[mnemonic] = { MEDIA_SUBTYPE[sub_type] for sub_type in set_subtype }
         else:
@@ -533,10 +531,10 @@ def parse_config(command, configuration):
 
             for (action, description) in rule[KEY_RESPONSES].items():
                 if action not in RETURN_CODES:
-                    raise Exception("Invalid action '{}'".format(action))
+                    raise Exception(f"Invalid action '{action}'")
 
                 if action in responses:
-                    raise Exception("Duplicate action '{}'".format(action))
+                    raise Exception(f"Duplicate action '{action}'")
 
                 responses[action] = description
         else:
@@ -553,14 +551,14 @@ def parse_config(command, configuration):
                 if primary is None:
                     primary = DISPOSAL_NONE
                 elif primary not in disposal_actions and not primary.startswith("hold:"):
-                    raise Exception("Modified disposal has invalid primary action '{}'".format(primary))
+                    raise Exception(f"Modified disposal has invalid primary action '{primary}'")
 
                 secondary = modified.get(KEY_SECONDARY)
 
                 if secondary is None:
                     secondary = DISPOSAL_NONE
                 elif secondary not in disposal_actions and not secondary.startswith("hold:"):
-                    raise Exception("Modified disposal has invalid secondary action '{}'".format(secondary))
+                    raise Exception(f"Modified disposal has invalid secondary action '{secondary}'")
 
                 modified = TupleAction(primary=primary, secondary=secondary)
             else:
@@ -574,14 +572,14 @@ def parse_config(command, configuration):
                 if primary is None:
                     primary = DISPOSAL_NONE
                 elif primary not in disposal_actions and not primary.startswith("hold:"):
-                    raise Exception("Detected disposal has invalid primary action '{}'".format(primary))
+                    raise Exception(f"Detected disposal has invalid primary action '{primary}'")
 
                 secondary = detected.get(KEY_SECONDARY)
 
                 if secondary is None:
                     secondary = DISPOSAL_NONE
                 elif secondary not in disposal_actions and not secondary.startswith("hold:"):
-                    raise Exception("Detected disposal has invalid secondary action '{}'".format(secondary))
+                    raise Exception(f"Detected disposal has invalid secondary action '{secondary}'")
 
                 detected = TupleAction(primary=primary, secondary=secondary)
             else:
@@ -596,16 +594,16 @@ def parse_config(command, configuration):
 
             for (key, parameter) in rule[KEY_CONFIG].items():
                 if key in config:
-                    raise Exception("Duplicate parameter '{}'".format(key))
+                    raise Exception(f"Duplicate parameter '{key}'")
 
                 if not PARAMETER_TYPE in parameter:
-                    raise Exception("Parameter '{}' missing type".format(key))
+                    raise Exception(f"Parameter '{key}' missing type")
 
                 if not PARAMETER_DESCRIPTION in parameter:
-                    raise Exception("Parameter '{}' missing description".format(key))
+                    raise Exception(f"Parameter '{key}' missing description")
 
                 if not PARAMETER_VALUE in parameter:
-                    raise Exception("Parameter '{}' missing value".format(key))
+                    raise Exception(f"Parameter '{key}' missing value")
 
                 config[key] = TupleParameter(type=parameter[PARAMETER_TYPE], description=parameter[PARAMETER_DESCRIPTION], value=parameter[PARAMETER_VALUE])
         else:
@@ -635,12 +633,12 @@ def download_script(command):
     :type command: str
     :rtype: str
     """
-    url_script = "{}/{}/{}.py".format(URL_REPO, command, command)
+    url_script = f"{URL_REPO}/{command}/{command}.py"
 
     try:
-        script = urlopen(url_script).read().decode(CHARSET_UTF8)
+        script = urlopen(url_script).read().decode()
     except Exception:
-        raise Exception("Cannot download external command script '{}'".format(url_script))
+        raise Exception(f"Cannot download external command script '{url_script}'")
 
     return script
 
@@ -662,17 +660,17 @@ def install_updates(interpreter, directory, set_command, set_lexical, command_in
         try:
             run(TEMPLATE_PIP.substitute(interpreter=interpreter, modules=" ".join(modules)), shell=True, stdout=DEVNULL, stderr=DEVNULL, check=True)
         except Exception:
-            raise Exception("Cannot install Python modules {}".format(str(modules)[1:-1]))
+            raise Exception(f"Cannot install Python modules {str(modules)[1:-1]}")
 
         try:
-            urlretrieve(URL_COMMAND, directory.joinpath(FILE_COMMAND))
+            urlretrieve(URL_COMMAND, directory / FILE_COMMAND)
         except Exception:
-            raise Exception("Cannot download external command script '{}' to file '{}'".format(URL_COMMAND, directory.joinpath(FILE_COMMAND)))
+            raise Exception(f"Cannot download external command script '{URL_COMMAND}' to file '{directory / FILE_COMMAND}'")
 
         try:
-            library = urlopen(URL_LIBRARY).read().decode(CHARSET_UTF8)
+            library = urlopen(URL_LIBRARY).read().decode()
         except Exception:
-            raise Exception("Cannot download external command library '{}'".format(URL_LIBRARY))
+            raise Exception(f"Cannot download external command library '{URL_LIBRARY}'")
 
         create_list("lexical", NAME_LIBRARY, [ library, ])
 
@@ -696,7 +694,7 @@ def apply_configuration():
         with open(FILE_APPLY, "w") as f:
             f.write("reason:upgrade\ndetail:applied by external_commands")
     except Exception:
-        raise Exception("Cannot write apply configuration file '{}'".format(FILE_APPLY))
+        raise Exception(f"Cannot write apply configuration file '{FILE_APPLY}'")
 
     reload_webgui()
 
@@ -707,7 +705,7 @@ def command_list(_, command_info):
     :type command_info: dict
     """
     for command in sorted(command_info.keys()):
-        print("{}\t\t{}".format(command, command_info[command]))
+        print(f"{command}\t\t{command_info[command]}")
 
 def command_info(args, _):
     """
@@ -716,12 +714,12 @@ def command_info(args, _):
     :type args: argparse.Namespace
     """
     for command in args.command:
-        url_readme = "{}/{}/{}".format(URL_REPO, command, FILE_README)
+        url_readme = f"{URL_REPO}/{command}/{FILE_README}"
 
         try:
-            readme = urlopen(url_readme).read().decode(CHARSET_UTF8)
+            readme = urlopen(url_readme).read().decode()
         except Exception:
-            raise Exception("Cannot download readme file '{}'".format(url_readme))
+            raise Exception(f"Cannot download readme file '{url_readme}'")
 
         print(readme)
 
@@ -733,13 +731,13 @@ def status_changed():
         with open(FILE_STATUS, "r") as f:
             content = f.read()
     except Exception:
-        raise Exception("Cannot read status file '{}'".format(FILE_STATUS))
+        raise Exception(f"Cannot read status file '{FILE_STATUS}'")
 
     try:
         with open(FILE_STATUS, "w") as f:
             f.write(content.replace(' changesMade="false" ', ' changesMade="true" '))
     except Exception:
-        raise Exception("Cannot write status file '{}'".format(FILE_STATUS))
+        raise Exception(f"Cannot write status file '{FILE_STATUS}'")
 
 def command_install(args, command_info):
     """
@@ -753,7 +751,7 @@ def command_install(args, command_info):
     duplicate = { NAME_COMMAND.format(command) for command in args.command } & set_lexical
 
     if duplicate:
-        raise Exception("External command scripts {} already exist".format(str(duplicate)[1:-1]))
+        raise Exception(f"External command scripts {str(duplicate)[1:-1]} already exist")
 
     dict_media_type = get_media_types()
 
@@ -764,12 +762,12 @@ def command_install(args, command_info):
     for command in args.command:
         script = download_script(command)
 
-        url_config = "{}/{}/{}".format(URL_REPO, command, FILE_CONFIG)
+        url_config = f"{URL_REPO}/{command}/{FILE_CONFIG}"
 
         try:
-            config = urlopen(url_config).read().decode(CHARSET_UTF8)
+            config = urlopen(url_config).read().decode()
         except Exception:
-            raise Exception("Cannot download external command configuration '{}'".format(url_config))
+            raise Exception(f"Cannot download external command configuration '{url_config}'")
 
         config = parse_config(command, config)
 
@@ -778,12 +776,12 @@ def command_install(args, command_info):
         duplicate = config.keys() & set_rule
 
         if duplicate:
-            raise Exception("Policy rules {} already exist".format(str(duplicate)[1:-1]))
+            raise Exception(f"Policy rules {str(duplicate)[1:-1]} already exist")
 
         duplicate = { NAME_CONFIG.format(name) for name in config.keys() } & set_lexical
 
         if duplicate:
-            raise Exception("External command configurations {} already exist".format(str(duplicate)[1:-1]))
+            raise Exception(f"External command configurations {str(duplicate)[1:-1]} already exist")
 
         create_list("lexical", NAME_COMMAND.format(command), [ script, ])
 
@@ -793,7 +791,7 @@ def command_install(args, command_info):
                     try:
                         run([ "/usr/bin/yum", "install", "-y", package ], stdout=DEVNULL, stderr=DEVNULL, check=True)
                     except Exception:
-                        raise Exception("Cannot install package '{}'".format(package))
+                        raise Exception(f"Cannot install package '{package}'")
 
             if rule.modules:
                 modules = sorted(rule.modules)
@@ -801,7 +799,7 @@ def command_install(args, command_info):
                 try:
                     run(TEMPLATE_PIP.substitute(interpreter=args.interpreter, modules=" ".join(modules)), shell=True, stdout=DEVNULL, stderr=DEVNULL, check=True)
                 except Exception:
-                    raise Exception("Cannot install Python modules {}".format(str(modules)[1:-1]))
+                    raise Exception(f"Cannot install Python modules {str(modules)[1:-1]}")
 
             for disposal_action in rule.disposal_actions:
                 for action in disposal_action:
@@ -816,9 +814,9 @@ def command_install(args, command_info):
                             with open(FILE_DISPOSAL, "r+b") as f:
                                 f.seek(-21, SEEK_END)
 
-                                f.write(TEMPLATE_AREA.substitute(name=quoteattr(action[5:]), uuid=uuid).encode(CHARSET_UTF8))
+                                f.write(TEMPLATE_AREA.substitute(name=quoteattr(action[5:]), uuid=uuid).encode())
                         except Exception:
-                            raise Exception("Cannot write disposal actions file '{}'".format(FILE_DISPOSAL))
+                            raise Exception(f"Cannot write disposal actions file '{FILE_DISPOSAL}'")
 
                         dict_disposal_action[action] = uuid
 
@@ -843,30 +841,50 @@ def command_install(args, command_info):
 
             while True:
                 uuid = generate_uuid()
-                file_rule = DIR_RULES.joinpath("{}.xml".format(uuid))
+                file_rule = DIR_RULES / f"{uuid}.xml"
 
                 if not file_rule.exists():
                     break
+
+            list_media_type = list()
+
+            for (mnemonic, sub_types) in rule.media_types.items():
+                list_subtype = list()
+
+                if MediaSubtype.ENCRYPTED in dict_media_type[mnemonic].sub_types and MediaSubtype.ENCRYPTED in sub_types:
+                    list_subtype.append("enc")
+
+                if MediaSubtype.SIGNED in dict_media_type[mnemonic].sub_types and MediaSubtype.SIGNED in sub_types:
+                    list_subtype.append("digsign")
+
+                if MediaSubtype.SIGNED_ENCRYPTED in dict_media_type[mnemonic].sub_types and MediaSubtype.SIGNED_ENCRYPTED in sub_types:
+                    list_subtype.append("digsignenc")
+
+                if MediaSubtype.DRM in dict_media_type[mnemonic].sub_types and MediaSubtype.DRM in sub_types:
+                    list_subtype.append("drm")
+
+                if MediaSubtype.NOT_PROTECTED in dict_media_type[mnemonic].sub_types and MediaSubtype.NOT_PROTECTED in sub_types:
+                    list_subtype.append("notprotect")
+
+                if list_subtype:
+                    sub_types = f" {" ".join([ f'{subtype}="true"' for subtype in list_subtype ])}"
+                else:
+                    sub_types = ""
+
+                list_media_type.append(TEMPLATE_MEDIA.substitute(uuid=dict_media_type[mnemonic].uuid, sub_types=sub_types))
 
             try:
                 with open(file_rule, "w") as f:
                     f.write(TEMPLATE_RULE.substitute(
                         name=quoteattr(name),
                         uuid_rule=uuid,
-                        media_types="".join([ TEMPLATE_MEDIA.substitute(
-                            uuid=dict_media_type[mnemonic].uuid,
-                            sub_types="{}{}{}{}{}".format(' enc="true"' if MediaSubtype.ENCRYPTED in dict_media_type[mnemonic].sub_types and MediaSubtype.ENCRYPTED in sub_types else "", ' digsign="true"' if MediaSubtype.SIGNED in dict_media_type[mnemonic].sub_types and MediaSubtype.SIGNED in sub_types else "", ' digsignenc="true"' if MediaSubtype.SIGNED_ENCRYPTED in dict_media_type[mnemonic].sub_types and MediaSubtype.SIGNED_ENCRYPTED in sub_types else "", ' drm="true"' if MediaSubtype.DRM in dict_media_type[mnemonic].sub_types and MediaSubtype.DRM in sub_types else "", ' notprotect="true"' if MediaSubtype.NOT_PROTECTED in dict_media_type[mnemonic].sub_types and MediaSubtype.NOT_PROTECTED in sub_types else "")
-                        ) for (mnemonic, sub_types) in rule.media_types.items() ]),
+                        media_types="".join(list_media_type),
                         uuid_media=generate_uuid(),
                         uuid_direction=generate_uuid(),
                         uuid_command=generate_uuid(),
                         command=escape(str(args.interpreter)),
-                        parameters=escape("{} {}".format(args.directory.joinpath(FILE_COMMAND), rule.parameters)),
-                        responses="".join([ TEMPLATE_RESPONSE.substitute(
-                            action=action,
-                            return_code=RETURN_CODES[action],
-                            description=description
-                        ) for (action, description) in rule.responses.items() ]),
+                        parameters=escape(f"{args.directory / FILE_COMMAND} {rule.parameters}"),
+                        responses="".join([ TEMPLATE_RESPONSE.substitute(action=action, return_code=RETURN_CODES[action], description=description) for (action, description) in rule.responses.items() ]),
                         timeout=rule.timeout,
                         uuid_deliver=dict_disposal_action["deliver"],
                         uuid_none=dict_disposal_action["none"],
@@ -884,7 +902,7 @@ def command_install(args, command_info):
 
                 chown(file_rule, user=CS_USER, group=CS_GROUP)
             except Exception:
-                raise Exception("Cannot write policy rule file '{}'".format(file_rule))
+                raise Exception(f"Cannot write policy rule file '{file_rule}'")
 
     status_changed()
 
@@ -911,23 +929,23 @@ def command_update(args, command_info):
 def main(args):
     if hasattr(args, "directory"):
         if not args.directory.exists():
-            eprint("Path '{}' does not exist".format(args.directory))
+            eprint(f"Path '{args.directory}' does not exist")
 
             return ReturnCode.ERROR
 
         if not args.directory.is_dir():
-            eprint("Path '{}' not a directory".format(args.directory))
+            eprint(f"Path '{args.directory}' not a directory")
 
             return ReturnCode.ERROR
 
     if hasattr(args, "interpreter"):
         if not args.interpreter.exists():
-            eprint("Path '{}' does not exist".format(args.interpreter))
+            eprint("Path '{args.interpreter}' does not exist")
 
             return ReturnCode.ERROR
 
         if not args.interpreter.is_file():
-            eprint("Path '{}' not a file".format(args.interpreter))
+            eprint("Path '{args.interpreter}' not a file")
 
             return ReturnCode.ERROR
 
@@ -939,7 +957,7 @@ def main(args):
         invalid_commands = args.command - command_info.keys()
 
         if invalid_commands:
-            eprint("Invalid external commands {}".format(str(invalid_commands)[1:-1]))
+            eprint(f"Invalid external commands {str(invalid_commands)[1:-1]}")
 
             return ReturnCode.ERROR
 
@@ -951,7 +969,8 @@ def main(args):
         return ReturnCode.ERROR
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=DESCRIPTION)
+    parser = ArgumentParser(description=DESCRIPTION)
+
     parser.set_defaults(action=parser.print_help)
     subparsers = parser.add_subparsers()
 
@@ -965,15 +984,15 @@ if __name__ == "__main__":
     parser_install = subparsers.add_parser("install", help="install external commands")
     parser_install.set_defaults(action=command_install)
     parser_install.add_argument("command", metavar="COMMAND", type=str, nargs="+", help="one or more external commands")
-    parser_install.add_argument("-d", "--directory", metavar="DIRECTORY", type=Path, default=DEFAULT_DIRECTORY, help="directory for storing external command script (default={})".format(DEFAULT_DIRECTORY))
-    parser_install.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=Path, default=DEFAULT_INTERPRETER, help="Python 3 interpreter used for running external command (default={})".format(DEFAULT_INTERPRETER))
+    parser_install.add_argument("-d", "--directory", metavar="DIRECTORY", type=Path, default=DEFAULT_DIRECTORY, help=f"directory for storing external command script (default={DEFAULT_DIRECTORY})")
+    parser_install.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=Path, default=DEFAULT_INTERPRETER, help=f"Python 3 interpreter used for running external command (default={DEFAULT_INTERPRETER})")
     parser_install.add_argument("-r", "--reload", action="store_true", help="reload Clearswift web interface")
     parser_install.add_argument("-a", "--apply", action="store_true", help="apply Clearswift configuration changes (and reload web interface)")
 
     parser_update = subparsers.add_parser("update", help="update all installed external commands to latest version")
     parser_update.set_defaults(action=command_update)
-    parser_update.add_argument("-d", "--directory", metavar="DIRECTORY", type=Path, default=DEFAULT_DIRECTORY, help="directory for storing external command script (default={})".format(DEFAULT_DIRECTORY))
-    parser_update.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=Path, default=DEFAULT_INTERPRETER, help="Python 3 interpreter used for running external command (default={})".format(DEFAULT_INTERPRETER))
+    parser_update.add_argument("-d", "--directory", metavar="DIRECTORY", type=Path, default=DEFAULT_DIRECTORY, help=f"directory for storing external command script (default={DEFAULT_DIRECTORY})")
+    parser_update.add_argument("-i", "--interpreter", metavar="INTERPRETER", type=Path, default=DEFAULT_INTERPRETER, help=f"Python 3 interpreter used for running external command (default={DEFAULT_INTERPRETER})")
     parser_update.add_argument("-r", "--reload", action="store_true", help="reload Clearswift web interface")
     parser_update.add_argument("-a", "--apply", action="store_true", help="apply Clearswift configuration changes (and reload web interface)")
 
@@ -982,6 +1001,6 @@ if __name__ == "__main__":
     if not args.action in { command_list, command_info, command_install, command_update }:
         args.action()
 
-        sys.exit(ReturnCode.OK)
+        exit(ReturnCode.OK)
 
-    sys.exit(main(args))
+    exit(main(args))
