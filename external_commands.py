@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-# external_commands.py V3.1.0
+# external_commands.py V3.1.1
 #
 # Copyright (c) 2021-2024 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
 
 from argparse import ArgumentParser
 from enum import unique, IntEnum
-from sys import stderr, exit
+from sys import stderr, exit, executable
 from pathlib import Path
 from string import Template
 from collections import namedtuple, Counter
@@ -23,7 +23,7 @@ from urllib.request import urlopen, urlretrieve
 DESCRIPTION = "install and update external commands for Clearswift SEG 5"
 
 DEFAULT_DIRECTORY = Path("/opt/netcon_scripts")
-DEFAULT_INTERPRETER = Path(sys.executable)
+DEFAULT_INTERPRETER = Path(executable)
 
 FILE_README = "README.md"
 FILE_CONFIG = "config.json"
@@ -705,7 +705,7 @@ def command_list(_, command_info):
     :type command_info: dict
     """
     for command in sorted(command_info.keys()):
-        print(f"{command}\t\t{command_info[command]}")
+        print(f"{command} - {command_info[command]}")
 
 def command_info(args, _):
     """
