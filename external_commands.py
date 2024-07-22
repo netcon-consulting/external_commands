@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# external_commands.py V3.1.1
+# external_commands.py V3.2.0
 #
 # Copyright (c) 2021-2024 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -51,7 +51,7 @@ FILE_MEDIATYPES = Path("/opt/cs-gateway/cfg/ui/mediatypes.xml")
 FILE_STATUS = DIR_UICONFIG / "trail.xml"
 FILE_APPLY = Path("/opt/cs-gateway/upgradesignals/applyconfiguration")
 
-MODULES_LIBRARY = { "toml", "pyzipper", "lxml", "html5lib", "dnspython" }
+MODULES_LIBRARY = { "toml", "pyzipper", "lxml", "html5lib", "dnspython", "beautifulsoup4", "faust-cchardet" }
 
 TEMPLATE_PIP = Template("$interpreter -m pip install --upgrade $modules $$($interpreter -m pip list 2> /dev/null | tail -n +3 | cut -d ' ' -f1)")
 
